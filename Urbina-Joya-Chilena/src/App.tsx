@@ -191,7 +191,7 @@ function App() {
                       <span style={badgeStyle}>{p.tipo_joyas?.nombre_tipo}</span> 
                       <span style={{marginLeft:'5px', color:'#555'}}>{p.material?.nombre_material}</span>
                     </td>
-                    <td style={{ padding: '12px', fontWeight: 'bold' }}>{p.stock}</td>
+                    <td style={{ padding: '12px', fontWeight: 'bold', color: 'rgba(0, 0, 0, 1)' }}>{p.stock}</td>
                     <td style={{ padding: '12px' }}>
                       <span style={{ 
                         background: p.stock < 3 ? '#fecaca' : '#d1fae5', 

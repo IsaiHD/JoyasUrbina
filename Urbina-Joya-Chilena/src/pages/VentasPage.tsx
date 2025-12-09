@@ -9,7 +9,7 @@ export default function SalesPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [pagos, setPagos] = useState<MetodoPago[]>([]);
   const [selectedPago, setSelectedPago] = useState<number>(0);
-  const [precioInput, setPrecioInput] = useState<number>(0); // Precio manual ya que no tenemos precio en la tabla producto aun
+  const [precioInput] = useState<number>(0); // Precio manual ya que no tenemos precio en la tabla producto aun
   const [searchTerm, setSearchTerm] = useState('');
   const [loadingSale, setLoadingSale] = useState(false);
 

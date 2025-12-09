@@ -10,7 +10,7 @@ export const salesService = {
   },
 
   // Procesar la venta completa
-  processSale: async (cart: CartItem[], idPago: number, totalTotal: number) => {
+  processSale: async (cart: CartItem[], idPago: number, _totalTotal: number) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Usuario no autenticado");
 

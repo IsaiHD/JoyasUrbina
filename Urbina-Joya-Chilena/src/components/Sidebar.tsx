@@ -1,76 +1,57 @@
+import './Sidebar.css';
 
 interface Props {
   currentView: string;
   onNavigate: (view: string) => void;
   onLogout: () => void;
   userEmail: string;
-  role: string | null; // <--- AGREGAMOS ESTA PROP NUEVA
+  role: string | null;
 }
 
 export default function Sidebar({ currentView, onNavigate, onLogout, userEmail, role }: Props) {
   return (
-    <aside style={{ 
-      width: '250px', 
-      background: '#111827', 
-      color: 'white', 
-      display: 'flex', 
-      flexDirection: 'column',
-      padding: '20px',
-      flexShrink: 0 // Evita que se aplaste
-    }}>
-      <h2 style={{ color: '#3b82f6', marginBottom: '40px' }}>💎 Joyas Urbina</h2>
+    <aside className="sidebar">
+      <div className="sidebar-header">
+        <h2>💎 Joyas Urbina</h2>
+      </div>
 
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
-        {/* BOTÓN DASHBOARD: Solo visible si role === 'admin' */}
+      <nav className="sidebar-nav">
         {role === 'admin' && (
           <button 
             onClick={() => onNavigate('dashboard')}
-            style={btnStyle(currentView === 'dashboard')}
+            className={`nav-btn ${currentView === 'dashboard' ? 'active' : ''}`}
           >
-            📊 Dashboard
+            <span className="icon">📊</span>
+            <span className="text">Dashboard</span>
           </button>
         )}
 
         <button 
           onClick={() => onNavigate('inventory')}
-          style={btnStyle(currentView === 'inventory')}
+          className={`nav-btn ${currentView === 'inventory' ? 'active' : ''}`}
         >
-          📦 Inventario
+          <span className="icon">📦</span>
+          <span className="text">Inventario</span>
         </button>
         
         <button 
           onClick={() => onNavigate('sales')}
-          style={btnStyle(currentView === 'sales')}
+          className={`nav-btn ${currentView === 'sales' ? 'active' : ''}`}
         >
-          💰 Vender (POS)
+          <span className="icon">💰</span>
+          <span className="text">Vender</span>
         </button>
       </nav>
 
-      <div style={{ borderTop: '1px solid #374151', paddingTop: '20px' }}>
-        <div style={{ fontSize: '0.8em', color: '#9ca3af', marginBottom: '10px' }}>
-          {userEmail}
-        </div>
-        <button 
-          onClick={onLogout}
-          style={{ ...btnStyle(false), background: '#7f1d1d', color: '#fca5a5' }}
-        >
-          Cerrar Sesión
+      <div className="sidebar-footer">
+        <div className="user-email">{userEmail}</div>
+        
+        {/* MODIFICADO: Agregamos estructura de Icono + Texto */}
+        <button onClick={onLogout} className="logout-btn">
+          <span className="icon">🚪</span>
+          <span className="text">Salir</span>
         </button>
       </div>
     </aside>
   );
 }
-
-// Estilos dinámicos para saber cuál está activo
-const btnStyle = (isActive: boolean) => ({
-  background: isActive ? '#374151' : 'transparent',
-  color: isActive ? 'white' : '#9ca3af',
-  border: 'none',
-  padding: '12px',
-  textAlign: 'left' as const,
-  borderRadius: '8px',
-  cursor: 'pointer',
-  fontSize: '1em',
-  fontWeight: isActive ? 'bold' : 'normal',
-  transition: 'all 0.2s'
-});

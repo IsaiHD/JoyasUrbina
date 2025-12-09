@@ -19,3 +19,20 @@ html, body {
   display: flex;
   flex-direction: column;
 }
+
+/* Hacer que las tablas sean responsive */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* En móviles, permitimos scroll horizontal en contenedores de tablas */
+@media (max-width: 768px) {
+  th, td {
+    padding: 10px 5px !important; /* Menos padding */
+    font-size: 0.85em !important; /* Letra un poco más chica */
+  }
+  
+  /* Ocultar columnas menos importantes en celular si quieres */
+  /* th:nth-child(3), td:nth-child(3) { display: none; } */ 
+}

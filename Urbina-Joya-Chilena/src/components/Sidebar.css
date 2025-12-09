@@ -1,0 +1,168 @@
+/* --- ESTILO DE ESCRITORIO --- */
+.sidebar {
+  width: 250px;
+  background-color: #111827;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  flex-shrink: 0;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+.sidebar-header h2 {
+  color: #3b82f6;
+  margin-bottom: 40px;
+  margin-top: 0;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+/* Botones de Navegación */
+.nav-btn {
+  background: transparent;
+  color: #9ca3af;
+  border: none;
+  padding: 12px;
+  text-align: left;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1em;
+  font-weight: normal;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-btn.active {
+  background-color: #374151;
+  color: white;
+  font-weight: bold;
+}
+
+.nav-btn:hover {
+  background-color: #1f2937;
+}
+
+/* Footer (Email y Logout) */
+.sidebar-footer {
+  border-top: 1px solid #374151;
+  padding-top: 20px;
+}
+
+.user-email {
+  font-size: 0.8em;
+  color: #9ca3af;
+  margin-bottom: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Botón Logout Escritorio */
+.logout-btn {
+  width: 100%;
+  padding: 12px;
+  background-color: #7f1d1d; /* Rojo */
+  color: #fca5a5;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.2s;
+  display: flex;           /* Flex para centrar */
+  justify-content: center; /* Centrado */
+  align-items: center;
+  gap: 8px;
+}
+
+.logout-btn:hover {
+  background-color: #991b1b;
+}
+
+/* En escritorio, ocultamos el icono de puerta si prefieres solo texto,
+   o lo dejamos visible. Aquí lo dejo visible porque se ve bien. */
+.logout-btn .icon {
+  font-size: 1.2em;
+}
+
+/* --- ESTILO PARA CELULAR (Responsive) --- */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 70px;
+    flex-direction: row; /* Horizontal */
+    justify-content: space-between; /* Espaciado entre items */
+    padding: 0 15px; /* Un poco de margen a los lados */
+    background-color: #111827;
+    z-index: 1000;
+    box-shadow: 0 -4px 10px rgba(0,0,0,0.3);
+    align-items: center;
+  }
+
+  /* Ocultamos Header y Email */
+  .sidebar-header, 
+  .user-email {
+    display: none;
+  }
+
+  /* Footer: Ya no lo ocultamos, lo integramos a la fila */
+  .sidebar-footer {
+    border-top: none;
+    padding-top: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    justify-content: space-around; /* Distribuir iconos */
+    width: auto;
+    flex: 1; /* Que ocupe el espacio central */
+  }
+
+  /* Estilo unificado para botones (Nav y Logout) en móvil */
+  .nav-btn, .logout-btn {
+    flex-direction: column;
+    justify-content: center;
+    padding: 5px 10px;
+    font-size: 0.8em;
+    color: #9ca3af;
+    background: transparent !important; /* Quitamos fondo rojo */
+    border-radius: 0;
+    height: auto;
+    width: auto;
+  }
+
+  /* Texto oculto en móvil */
+  .nav-btn .text, 
+  .logout-btn .text {
+    display: none;
+  }
+
+  /* Iconos grandes */
+  .nav-btn .icon,
+  .logout-btn .icon {
+    font-size: 1.6em;
+    margin-bottom: 2px;
+  }
+
+  .nav-btn.active {
+    color: #3b82f6;
+  }
+
+  /* El icono de salir en rojo suave para diferenciarlo */
+  .logout-btn {
+    color: #ef4444; 
+  }
+}

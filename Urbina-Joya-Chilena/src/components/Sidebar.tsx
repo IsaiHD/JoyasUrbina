@@ -1,4 +1,5 @@
 import './Sidebar.css';
+import logo from '../assets/logo-white.png'; // <--- 1. Asignamos nombre "logo"
 
 interface Props {
   currentView: string;
@@ -12,7 +13,8 @@ export default function Sidebar({ currentView, onNavigate, onLogout, userEmail, 
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <h2>💎 Joyas Urbina</h2>
+        {/* 2. Usamos la imagen en lugar del texto */}
+        <img src={logo} alt="Joyas Urbina" className="sidebar-logo" />
       </div>
 
       <nav className="sidebar-nav">
@@ -46,7 +48,6 @@ export default function Sidebar({ currentView, onNavigate, onLogout, userEmail, 
       <div className="sidebar-footer">
         <div className="user-email">{userEmail}</div>
         
-        {/* MODIFICADO: Agregamos estructura de Icono + Texto */}
         <button onClick={onLogout} className="logout-btn">
           <span className="icon">🚪</span>
           <span className="text">Salir</span>

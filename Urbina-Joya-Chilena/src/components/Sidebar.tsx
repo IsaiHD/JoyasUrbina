@@ -7,6 +7,7 @@ interface Props {
   onLogout: () => void;
   userEmail: string;
   role: string | null;
+  onOpenProfile: () => void; // <--- 1. AGREGAMOS ESTA PROP DE NUEVO
 }
 
 export default function Sidebar({ currentView, onNavigate, onLogout, userEmail, role }: Props) {

@@ -19,10 +19,13 @@ export default function LoginPage() {
   return (
     <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f3f4f6' }}>
       <div style={{ background: 'white', padding: '2rem', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px' }}>
+        <img src="../src/assets/logo-black.png" alt="Logo" 
+          style={{ width: '220px',
+                   height: 'auto',
+                   marginLeft:'0%'}}
+        />
         
-        <h1 style={{ textAlign: 'center', color: '#1f2937', marginBottom: '10px' }}>💎 Joyas Urbina</h1>
-        <p style={{ textAlign: 'center', color: '#6b7280', marginBottom: '20px' }}>Acceso exclusivo personal</p>
-        
+        <p style={{ textAlign: 'center', color: '#6b7280', marginBottom: '20px'}}>Acceso exclusivo personal</p>
         {error && (
           <div style={{ background: '#fee2e2', color: '#991b1b', padding: '10px', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.9rem' }}>
             ⚠️ {error}
@@ -33,7 +36,7 @@ export default function LoginPage() {
           <input
             type="email"
             name="email"
-            placeholder="Correo corporativo"
+            placeholder="Correo electrónico"
             value={form.email}
             onChange={handleChange}
             required

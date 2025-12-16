@@ -1,5 +1,5 @@
 import './Sidebar.css';
-import logo from '../assets/logo-white.png'; // <--- 1. Asignamos nombre "logo"
+import logo from '/logo-white.png'; // <--- 1. Asignamos nombre "logo"
 
 interface Props {
   currentView: string;

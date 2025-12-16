@@ -33,8 +33,6 @@ function App() {
     if (session) {
       // Verificamos si tiene nombre asignado
       if (!userName) {
-        console.log(userName, role);
-        console.log("👤 Usuario nuevo o sin nombre detectado -> Activando Setup");
         setShowSetup(true);
       } else {
         // Si ya tiene nombre, aseguramos que el modal esté cerrado

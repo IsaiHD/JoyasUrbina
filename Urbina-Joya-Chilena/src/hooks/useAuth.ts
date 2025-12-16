@@ -13,9 +13,8 @@ export function useAuth() {
   // Cache para evitar bucles de peticiones
   const lastProcessedId = useRef<string | null>(null);
 
-  // Función Fetch RAW corregida: Ahora pide el TOKEN DE USUARIO
+  // Función Fetch RAW corregida
   const fetchUserData = async (userId: string, token: string) => {
-    // Si ya procesamos este ID, salimos
     if (lastProcessedId.current === userId) return;
 
     lastProcessedId.current = userId;
@@ -30,7 +29,7 @@ export function useAuth() {
         method: 'GET',
         headers: {
           'apikey': supabaseKey,
-          'Authorization': `Bearer ${token}`, // <--- AQUÍ ESTÁ EL CAMBIO CLAVE
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
@@ -48,7 +47,6 @@ export function useAuth() {
         }
       } else {
         console.error("Error HTTP:", response.statusText);
-        // Permitimos reintentar si falló la red
         lastProcessedId.current = null; 
       }
 
@@ -61,13 +59,13 @@ export function useAuth() {
   useEffect(() => {
     let mounted = true;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+    // CAMBIO AQUÍ: Usamos '_event' en lugar de 'event' para evitar el error de TS
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
       if (!mounted) return;
 
       setSession(currentSession);
 
       if (currentSession?.user && currentSession?.access_token) {
-        // Pasamos el ID y el TOKEN real
         await fetchUserData(currentSession.user.id, currentSession.access_token);
       } else {
         setRole(null);

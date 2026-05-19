@@ -21,7 +21,7 @@ export const inventoryService = {
   // NUEVO: Método para crear
   create: async (product: CreateProductDTO): Promise<void> => {
     const { error } = await supabase.from('producto').insert({
-      SKU: product.sku,      // Mapeamos a la columna exacta de la BD
+      "SKU": product.sku,      // Mapeamos a la columna exacta de la BD
       nombre: product.nombre,
       stock: product.stock,
       id_material: product.id_material,

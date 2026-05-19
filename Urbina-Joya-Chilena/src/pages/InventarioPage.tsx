@@ -2,35 +2,41 @@ import { useState } from 'react';
 import { useInventory } from '../hooks/useInventario';
 import { useAuth } from '../hooks/useAuth';
 import CreateProductModal from '../components/CreateProductModal';
-import type { CreateProductDTO, Producto } from '../types/inventario.types'; // Importar tipos
+import type { CreateProductDTO, Producto } from '../types/inventario.types';
 
 export default function InventoryPage() {
-  const { products, catalogs, loading, error, addProduct, updateProduct } = useInventory(); // <--- Traemos updateProduct
+  // 1. Extraemos las nuevas propiedades del hook
+  const { 
+    products, 
+    catalogs, 
+    loading, 
+    error, 
+    addProduct, 
+    updateProduct,
+    skuPrevisualizado,
+    previewSKU 
+  } = useInventory();
+  
   const { role } = useAuth();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<Producto | null>(null); // <--- Estado para saber qué editamos
+  const [editingItem, setEditingItem] = useState<Producto | null>(null);
 
-  // Función inteligente que maneja Crear o Editar
   const handleSave = async (data: CreateProductDTO, id?: number) => {
     if (id) {
-      // Si viene ID, es UPDATE
       return await updateProduct(id, data);
     } else {
-      // Si no, es CREATE
       return await addProduct(data);
     }
   };
 
-  // Abrir modal para crear
   const openCreate = () => {
-    setEditingItem(null); // Limpiamos edición
+    setEditingItem(null);
     setIsModalOpen(true);
   };
 
-  // Abrir modal para editar
   const openEdit = (producto: Producto) => {
-    setEditingItem(producto); // Cargamos el producto a editar
+    setEditingItem(producto);
     setIsModalOpen(true);
   };
 
@@ -48,7 +54,7 @@ export default function InventoryPage() {
         
         {role === 'admin' && (
           <button 
-            onClick={openCreate} // <--- Usamos la nueva función
+            onClick={openCreate}
             style={{ 
               backgroundColor: '#2563eb', color: 'white', border: 'none', 
               padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', 
@@ -69,7 +75,6 @@ export default function InventoryPage() {
                 <th style={{ padding: '16px', color: '#6b7280' }}>SKU</th>
                 <th style={{ padding: '16px', color: '#6b7280' }}>Detalles</th>
                 <th style={{ padding: '16px', color: '#6b7280' }}>Stock</th>
-                {/* Columna extra para acciones si es admin */}
                 {role === 'admin' && <th style={{ padding: '16px' }}>Acciones</th>}
               </tr>
             </thead>
@@ -84,7 +89,6 @@ export default function InventoryPage() {
                   </td>
                   <td style={{ padding: '16px', fontWeight: 'bold' }}>{p.stock}</td>
                   
-                  {/* BOTÓN DE EDITAR */}
                   {role === 'admin' && (
                     <td style={{ padding: '16px' }}>
                       <button 
@@ -93,7 +97,7 @@ export default function InventoryPage() {
                           background: 'none', border: '1px solid #d1d5db', borderRadius: '4px', 
                           cursor: 'pointer', padding: '5px 10px', fontSize: '1.2em' 
                         }}
-                        title="Editar Stock / Detalles"
+                        title="Editar Stock"
                       >
                         ✏️
                       </button>
@@ -110,12 +114,14 @@ export default function InventoryPage() {
         <CreateProductModal 
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          onSubmit={handleSave} // <--- Pasamos la función inteligente
+          onSubmit={handleSave}
           catalogs={catalogs}
-          productToEdit={editingItem} // <--- Pasamos el producto a editar
+          productToEdit={editingItem}
+          // 2. Pasamos las herramientas de SKU al modal
+          skuPrevisualizado={skuPrevisualizado}
+          previewSKU={previewSKU}
         />
       )}
-
     </div>
   );
 }

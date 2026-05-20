@@ -44,7 +44,7 @@ export default function Sidebar({ currentView, onNavigate, onLogout, userEmail, 
         <div className="user-email" style={{ marginBottom: '10px', fontSize: '0.9em', color: '#9ca3af' }}>
           {userEmail}
         </div>
-        s
+        
         {/* 4. Agregamos el botón para cambiar contraseña (Perfil) */}
         <button onClick={onOpenProfile} className="nav-btn" style={{ marginBottom: '10px', width: '100%' }}>
           <span className="icon">🔒</span>

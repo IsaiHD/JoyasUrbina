@@ -14,8 +14,8 @@ export interface Venta {
   id_metodo_pago: number;
   id_tipo: number;
   id_material: number;
-  id_piedra: number;
-  id_piedra_secundaria?: number;
+  id_piedra: number | null;
+  id_piedra_secundaria?: number | null;
   id_usuario: string;
   
   // Relaciones que traeremos de Supabase para mostrar los nombres en la tabla
@@ -35,7 +35,7 @@ export interface CreateVentaDTO {
   id_metodo_pago: number;
   id_tipo: number;
   id_material: number;
-  id_piedra: number;
-  id_piedra_secundaria?: number;
+  id_piedra: number | null;
+  id_piedra_secundaria?: number | null;
   id_usuario: string;
 }

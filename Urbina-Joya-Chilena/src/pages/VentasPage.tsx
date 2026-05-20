@@ -90,8 +90,8 @@ export default function VentasPage() {
         id_metodo_pago: form.id_metodo_pago,
         id_tipo: form.id_tipo,
         id_material: form.id_material,
-        id_piedra: form.id_piedra,
-        id_piedra_secundaria: form.es_reversible ? form.id_piedra_secundaria : undefined,
+        id_piedra: form.id_piedra !== 0 ? form.id_piedra : null,
+        id_piedra_secundaria: form.es_reversible ? form.id_piedra_secundaria : null,
         id_usuario: session?.user?.id || ''
       };
 

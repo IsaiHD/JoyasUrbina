@@ -3,9 +3,27 @@ import { useAuth } from '../hooks/useAuth';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
+import * as XLSX from 'xlsx'; // <--- 1. Importa esto arriba
 import KpiCard from '../components/KpiCard/KpiCard'; 
 
 const BAR_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#6366f1'];
+
+const exportarExcel = () => {
+  // 1. Preparamos los datos
+  const datos = [
+    { Concepto: "Ingresos Estimados (Mes Actual)", Monto: 1500000 },
+    { Concepto: "Ingresos Proyectados (Mes + 1)", Monto: 1800000 },
+    { Concepto: "Ingresos Proyectados (Mes + 2)", Monto: 2100000 },
+  ];
+
+  // 2. Creamos la hoja de cálculo
+  const worksheet = XLSX.utils.json_to_sheet(datos);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Proyección");
+
+  // 3. Forzamos la descarga
+  XLSX.writeFile(workbook, "Proyeccion_Ingresos.xlsx");
+};
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -78,6 +96,31 @@ export default function DashboardPage() {
 
             </BarChart>
           </ResponsiveContainer>
+        </div>
+        {/* PROYECCIÓN MENSUAL PEQUEÑA CON DESCARGA */}
+        <div style={{ 
+          background: '#eff6ff', padding: '20px', borderRadius: '12px', 
+          border: '1px solid #bfdbfe', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px'
+        }}>
+          <div>
+            <h3 style={{ margin: 0, color: '#1e3a8a', fontSize: '1em' }}>🚀 Proyección Mensual</h3>
+            <p style={{ margin: '5px 0 0 0', color: '#60a5fa', fontSize: '0.85em' }}>Estimación basada en ritmo actual</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '1.5em', fontWeight: 'bold', color: '#1e3a8a' }}>$ 5.400.000</div>
+              <div style={{ fontSize: '0.8em', color: '#3b82f6' }}>Próximos 3 meses</div>
+            </div>
+            <button 
+              onClick={exportarExcel} 
+              style={{ 
+                background: '#2563eb', color: 'white', border: 'none', padding: '10px 15px', 
+                borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9em' 
+              }}
+            >
+              📊 Descargar Excel
+            </button>
+          </div>
         </div>
       </div>
     </div>

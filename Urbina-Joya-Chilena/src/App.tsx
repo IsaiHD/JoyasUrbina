@@ -1,13 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from './hooks/useAuth';
 
-// --- TUS IMPORTACIONES DE PÁGINAS ---
-// Asegúrate de que los nombres de archivo coincidan con lo que tienes en tu carpeta
+// --- IMPORTACIONES DE PÁGINAS ---
 import LoginPage from './pages/LoginPage';
-import InventoryPage from './pages/InventarioPage'; 
-import SalesPage from './pages/VentasPage';
+import VentasPage from './pages/VentasPage'; // Usamos directamente VentasPage
 import DashboardPage from './pages/DashboardPage';
-// ------------------------------------
 
 import Sidebar from './components/Sidebar';
 import ChangePasswordModal from './components/ChangePasswordModal';
@@ -15,40 +12,31 @@ import SetupAccountModal from './components/SetupAccountModal';
 import './App.css';
 
 function App() {
-  // Extraemos todo lo necesario del hook
   const { session, role, userName, loading, logout } = useAuth();
   
-  const [currentView, setCurrentView] = useState('inventory');
+  // 1. CAMBIO AQUÍ: La vista por defecto ahora es 'sales' (ventas)
+  const [currentView, setCurrentView] = useState('sales');
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   
-  // Estado para controlar el modal de Bienvenida
   const [showSetup, setShowSetup] = useState(false);
 
-  // EFECTO: Lógica inteligente para mostrar el Setup
   useEffect(() => {
-    // 1. Si el sistema dice "cargando", NO hacemos nada. Esperamos.
     if (loading) return;
 
-    // 2. Si ya terminó de cargar y tenemos usuario:
     if (session) {
-      // Verificamos si tiene nombre asignado
       if (!userName) {
         setShowSetup(true);
       } else {
-        // Si ya tiene nombre, aseguramos que el modal esté cerrado
         setShowSetup(false);
       }
     }
-  }, [session, loading, userName]); // Se ejecuta cuando cambia cualquiera de estos
+  }, [session, loading, userName]);
 
-  // Callback para cuando el usuario completa el registro
   const handleSetupSuccess = () => {
     setShowSetup(false);
-    // Recargamos para que useAuth vuelva a pedir los datos limpios
     window.location.reload(); 
   };
 
-  // 1. Pantalla de Carga
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: '50px', color: '#6b7280' }}>
@@ -57,10 +45,8 @@ function App() {
     );
   }
   
-  // 2. Si no hay sesión, mostramos el Login
   if (!session) return <LoginPage />;
 
-  // 3. App Principal
   return (
     <div className="app-container">
       <Sidebar 
@@ -74,19 +60,17 @@ function App() {
 
       <main className="main-content">
         <div className="content-scroll-area">
+          {/* 2. CAMBIO AQUÍ: Eliminamos InventoryPage y dejamos solo el Dashboard y Ventas */}
           {currentView === 'dashboard' && <DashboardPage />}
-          {currentView === 'inventory' && <InventoryPage />}
-          {currentView === 'sales' && <SalesPage />}
+          {currentView === 'sales' && <VentasPage />}
         </div>
       </main>
 
-      {/* Modal para cambiar contraseña voluntariamente (Perfil) */}
       <ChangePasswordModal 
         isOpen={isPasswordModalOpen} 
         onClose={() => setIsPasswordModalOpen(false)} 
       />
 
-      {/* Modal de Bienvenida OBLIGATORIO (Solo si no tiene nombre) */}
       <SetupAccountModal
         isOpen={showSetup}
         userId={session.user.id}

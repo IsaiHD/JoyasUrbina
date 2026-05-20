@@ -9,12 +9,9 @@ export interface StackedChartData {
 }
 
 export interface DashboardStats {
-  totalProducts: number;
-  lowStock: number;
   salesCount: number;
   revenueToday: number;
-  // Cambiamos a la nueva estructura y agregamos la lista de nombres
+  // Estructura para el gráfico de barras apiladas
   salesLast7Days: StackedChartData[];
-  productNamesList: string[]; // <--- NUEVO: Para saber qué barras pintar
-  stockByCategory: { name: string; value: number }[];
+  productNamesList: string[]; // Para saber qué barras pintar dinámicamente
 }

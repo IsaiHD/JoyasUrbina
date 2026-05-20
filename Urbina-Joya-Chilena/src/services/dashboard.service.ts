@@ -1,84 +1,69 @@
-// src/services/dashboard.service.ts
-import { supabase } from '../supabaseClient';
-import type { DashboardStats, StackedChartData } from '../types/dashboard.types';
+import { supabase } from '../supabaseClient'; // Ajusta la ruta a tu cliente
 
 export const dashboardService = {
-  getStats: async (): Promise<DashboardStats> => {
+  async getStats() {
     const today = new Date();
-    const startOfToday = today.toISOString().split('T')[0];
+    today.setHours(0, 0, 0, 0); // Inicio del día de hoy
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(today.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    // 1. Obtener todas las ventas de los últimos 7 días
+    const { data: recentSales, error: salesError } = await supabase
+      .from('venta')
+      .select('fecha_venta, precio_venta, nombre_producto')
+      .gte('fecha_venta', sevenDaysAgo.toISOString())
+      .order('fecha_venta', { ascending: true });
+
+    if (salesError) throw new Error(salesError.message);
+
+    let revenueToday = 0;
+    let salesCount = 0;
     
-    const lastWeek = new Date();
-    lastWeek.setDate(today.getDate() - 7);
-    const startOfLastWeek = lastWeek.toISOString();
+    // Objeto para agrupar ventas por día
+    const dailySalesMap: Record<string, any> = {};
+    const productNamesSet = new Set<string>(); // Para saber qué productos mostrar en la leyenda
 
-    const [prodResponse, salesResponse, salesWeekResponse] = await Promise.all([
-      supabase.from('producto').select('stock, tipo_joyas(nombre_tipo)'),
-      supabase.from('venta').select('total_venta').gte('created_at', `${startOfToday}T00:00:00`),
-      supabase.from('venta')
-        .select('total_venta, created_at, producto(nombre)')
-        .gte('created_at', startOfLastWeek)
-    ]);
-
-    if (prodResponse.error) throw new Error(prodResponse.error.message);
-    if (salesResponse.error) throw new Error(salesResponse.error.message);
-    if (salesWeekResponse.error) throw new Error(salesWeekResponse.error.message);
-
-    const productos = prodResponse.data || [];
-    const ventasHoy = salesResponse.data || [];
-    const ventasSemana = salesWeekResponse.data || [];
-
-    // --- LÓGICA GRÁFICO APILADO ---
-    
-    // 1. Inicializar mapa de los últimos 7 días y un Set para nombres únicos
-    const salesMap: Record<string, StackedChartData> = {};
-    const productNamesSet = new Set<string>(); // Usamos Set para no tener duplicados
-
+    // Inicializar los últimos 7 días en el mapa (para que no salgan días en blanco)
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(today.getDate() - i);
-      const dayName = d.toLocaleDateString('es-CL', { weekday: 'short' }); 
-      // Inicializamos solo con el nombre del día
-      salesMap[dayName] = { name: dayName }; 
+      const dayName = d.toLocaleDateString('es-CL', { weekday: 'short' });
+      dailySalesMap[dayName] = { name: dayName };
     }
 
-    // 2. Rellenar y aplanar datos
-    ventasSemana.forEach((v: any) => {
-      const date = new Date(v.created_at);
-      const dayName = date.toLocaleDateString('es-CL', { weekday: 'short' });
-      const productName = v.producto?.nombre || 'Otros';
-      const amount = Number(v.total_venta);
+    if (recentSales) {
+      recentSales.forEach(sale => {
+        const saleDate = new Date(sale.fecha_venta);
+        const dayName = saleDate.toLocaleDateString('es-CL', { weekday: 'short' });
+        
+        // Métricas de "Hoy"
+        if (saleDate >= today) {
+          revenueToday += sale.precio_venta;
+          salesCount++;
+        }
 
-      if (salesMap[dayName]) {
-        // Agregamos el nombre al Set global
+        // Datos para el gráfico apilado
+        const productName = sale.nombre_producto || 'Otros';
         productNamesSet.add(productName);
 
-        // Si ya existe valor para este producto ese día, sumamos; si no, inicializamos.
-        const currentAmount = (salesMap[dayName][productName] as number) || 0;
-        salesMap[dayName][productName] = currentAmount + amount;
-      }
-    });
+        if (dailySalesMap[dayName]) {
+          // Si el producto ya tiene ventas ese día, le sumamos el precio, si no, lo inicializamos
+          dailySalesMap[dayName][productName] = (dailySalesMap[dayName][productName] || 0) + sale.precio_venta;
+        }
+      });
+    }
 
-    // Convertir el mapa a array para Recharts
-    const salesLast7Days = Object.values(salesMap);
-    // Convertir el Set a array
+    // Convertir el mapa a un array para Recharts
+    const salesLast7Days = Object.values(dailySalesMap);
     const productNamesList = Array.from(productNamesSet);
 
-    // --- LÓGICA TORTA (Sin cambios) ---
-    const categoryMap: Record<string, number> = {};
-    productos.forEach((p: any) => {
-      const tipo = p.tipo_joyas?.nombre_tipo || 'Sin Tipo';
-      categoryMap[tipo] = (categoryMap[tipo] || 0) + 1;
-    });
-    const stockByCategory = Object.entries(categoryMap).map(([name, value]) => ({ name, value }));
-
     return {
-      totalProducts: productos.length,
-      lowStock: productos.filter((p: any) => p.stock <= 3).length,
-      salesCount: ventasHoy.length,
-      revenueToday: ventasHoy.reduce((acc, v) => acc + Number(v.total_venta), 0),
-      stockByCategory,
+      revenueToday,
+      salesCount,
       salesLast7Days,
-      productNamesList // Retornamos la lista para generar las barras
+      productNamesList
     };
   }
 };

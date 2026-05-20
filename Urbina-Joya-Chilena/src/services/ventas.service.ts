@@ -1,40 +1,60 @@
-import { supabase } from '../supabaseClient';
-import type { CartItem, MetodoPago } from '../types/ventas.types';
+// Asegúrate de que la ruta a tu supabaseClient sea la correcta
+import { supabase } from '../supabaseClient'; // o donde lo tengas
+import type { CreateVentaDTO, Venta } from '../types/ventas.types';
 
-export const salesService = {
-  // Obtener métodos de pago para el dropdown
-  getPaymentMethods: async (): Promise<MetodoPago[]> => {
-    const { data, error } = await supabase.from('metodo_pago').select('*');
+export const ventasService = {
+  // 1. Obtener todas las ventas (con sus nombres relacionados)
+  async getVentas(): Promise<Venta[]> {
+    const { data, error } = await supabase
+      .from('venta')
+      .select(`
+        *,
+        tipo_joyas ( id_tipo, nombre_tipo ),
+        material ( id_material, nombre_material ),
+        piedra_principal:piedra!venta_id_piedra_fkey ( id_piedra, nombre_piedra ),
+        piedra_secundaria:piedra!venta_id_piedra_secundaria_fkey ( id_piedra, nombre_piedra ),
+        metodo_pago ( id_pago, tipo_pago )
+      `)
+      .order('fecha_venta', { ascending: false });
+
     if (error) throw new Error(error.message);
-    return data as MetodoPago[];
+    return data || [];
+  },
+  
+  // 2. Registrar nueva venta
+  async createVenta(venta: CreateVentaDTO): Promise<boolean> {
+    const { error } = await supabase.from('venta').insert([venta]);
+    if (error) throw new Error(error.message);
+    return true;
   },
 
-  // Procesar la venta completa
-  processSale: async (cart: CartItem[], idPago: number, _totalTotal: number) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Usuario no autenticado");
+  // 3. Obtener los catálogos para el formulario
+  async getCatalogs() {
+    const [tiposRes, materialesRes, piedrasRes] = await Promise.all([
+      supabase.from('tipo_joyas').select('*').order('nombre_tipo'),
+      supabase.from('material').select('*').order('nombre_material'),
+      supabase.from('piedra').select('*').order('nombre_piedra')
+    ]);
 
-    // 1. Preparamos los datos para insertar en lote
-    const ventasParaInsertar = cart.map(item => ({
-      id_producto: item.id_producto,
-      id_usuario: user.id,
-      id_pago: idPago,
-      cantidad: item.cantidadVenta,
-      total_venta: item.subtotal // Ojo: aquí deberías tener precio unitario en producto, por ahora usaremos manual o un valor fijo
-    }));
+    if (tiposRes.error) throw new Error(tiposRes.error.message);
+    if (materialesRes.error) throw new Error(materialesRes.error.message);
+    if (piedrasRes.error) throw new Error(piedrasRes.error.message);
 
-    // 2. Insertamos las ventas
-    const { error: errorVenta } = await supabase.from('venta').insert(ventasParaInsertar);
-    if (errorVenta) throw new Error("Error registrando venta: " + errorVenta.message);
+    return {
+      tipos: tiposRes.data || [],
+      materiales: materialesRes.data || [],
+      piedras: piedrasRes.data || []
+    };
+  },
 
-    // 3. Descontamos Stock (Esto idealmente se hace con un RPC en BD, pero lo haremos aquí por simplicidad)
-    // Hacemos un loop de actualizaciones
-    for (const item of cart) {
-      const nuevoStock = item.stock - item.cantidadVenta;
-      await supabase
-        .from('producto')
-        .update({ stock: nuevoStock })
-        .eq('id_producto', item.id_producto);
-    }
+  // 4. Obtener métodos de pago
+  async getMetodosPago() {
+    const { data, error } = await supabase
+      .from('metodo_pago')
+      .select('*')
+      .order('tipo_pago');
+      
+    if (error) throw new Error(error.message);
+    return data || [];
   }
 };

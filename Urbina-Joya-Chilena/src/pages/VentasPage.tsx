@@ -1,84 +1,110 @@
 import { useState, useEffect } from 'react';
-import { useInventory } from '../hooks/useInventario';
-import { salesService } from '../services/ventas.service';
-import PriceModal from '../components/PrecioModal'; 
-import SuccessModal from '../components/CompraExitoModal'; // <--- 1. IMPORTAR NUEVO MODAL
-import type { CartItem, MetodoPago } from '../types/ventas.types';
-import type { Producto } from '../types/inventario.types';
+import { useVentas } from '../hooks/useVentas';
+import { useAuth } from '../hooks/useAuth';
+import type { CreateVentaDTO } from '../types/ventas.types';
+import SuccessModal from '../components/CompraExitoModal'; 
 
-export default function SalesPage() {
-  const { products, refresh } = useInventory();
+export default function VentasPage() {
+  const { ventas, catalogs, metodosPago, addVenta } = useVentas();
+  const { session } = useAuth();
   
-  // Estados principales
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [pagos, setPagos] = useState<MetodoPago[]>([]);
-  const [selectedPago, setSelectedPago] = useState<number>(0);
-  const [searchTerm, setSearchTerm] = useState('');
   const [loadingSale, setLoadingSale] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
-  // Estados para los Modales
-  const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
-  const [pendingProduct, setPendingProduct] = useState<Producto | null>(null);
-  const [showSuccess, setShowSuccess] = useState(false); // <--- 2. ESTADO PARA MODAL ÉXITO
+  const [form, setForm] = useState({
+    nombre_producto: '',
+    precio_venta: '', 
+    cantidad: 1,
+    es_reversible: false,
+    id_metodo_pago: 0,
+    id_tipo: 0,
+    id_material: 0,
+    id_piedra: 0,
+    id_piedra_secundaria: 0
+  });
 
+  // --- AUTO-GENERADOR DE NOMBRE ---
   useEffect(() => {
-    salesService.getPaymentMethods().then(setPagos);
-  }, []);
+    const idTipo = Number(form.id_tipo);
+    const idMat = Number(form.id_material);
+    const idPiedra1 = Number(form.id_piedra);
+    const idPiedra2 = Number(form.id_piedra_secundaria);
 
-  // --- LÓGICA AL HACER CLIC EN UN PRODUCTO ---
-  const handleProductClick = (product: Producto) => {
-    const exists = cart.find(c => c.id_producto === product.id_producto);
-    
-    if (exists) {
-      if (exists.cantidadVenta + 1 > product.stock) {
-        return alert(`¡Solo quedan ${product.stock} unidades!`);
-      }
-      const unitPrice = exists.subtotal / exists.cantidadVenta;
+    const tipoName = catalogs.tipos.find(t => t.id_tipo === idTipo)?.nombre_tipo;
+    const materialName = catalogs.materiales.find(m => m.id_material === idMat)?.nombre_material;
+    const piedraName = catalogs.piedras.find(p => p.id_piedra === idPiedra1)?.nombre_piedra;
+    const piedra2Name = catalogs.piedras.find(p => p.id_piedra === idPiedra2)?.nombre_piedra;
 
-      setCart(cart.map(c => c.id_producto === product.id_producto 
-        ? { ...c, cantidadVenta: c.cantidadVenta + 1, subtotal: (c.cantidadVenta + 1) * unitPrice } 
-        : c
-      ));
+    let autoNombre = '';
+    if (tipoName) autoNombre += tipoName;
+    if (materialName) autoNombre += ` de ${materialName}`;
 
+    if (form.es_reversible && piedraName && piedra2Name) {
+      autoNombre += ` Reversible ${piedraName} y ${piedra2Name}`;
+    } else if (piedraName && piedraName !== 'Sin Piedra') {
+      autoNombre += ` con ${piedraName}`;
+    }
+
+    if (autoNombre.trim() !== '') {
+      setForm(prev => ({ ...prev, nombre_producto: autoNombre.trim() }));
     } else {
-      if (product.stock < 1) return alert("Producto sin stock");
-      setPendingProduct(product);
-      setIsPriceModalOpen(true);
+      setForm(prev => ({ ...prev, nombre_producto: '' }));
     }
+  }, [form.id_tipo, form.id_material, form.id_piedra, form.id_piedra_secundaria, form.es_reversible, catalogs]);
+
+  const handleChange = (e: any) => {
+    const { name, value, type, tagName, checked } = e.target;
+    const val = type === 'checkbox' ? checked : 
+                (type === 'number' || tagName === 'SELECT') ? Number(value) : value;
+    
+    setForm(prev => ({ ...prev, [name]: val }));
   };
 
-  // --- LÓGICA CUANDO EL MODAL CONFIRMA EL PRECIO ---
-  const handlePriceConfirm = (price: number) => {
-    if (pendingProduct) {
-      setCart([...cart, { ...pendingProduct, cantidadVenta: 1, subtotal: price }]);
-      setPendingProduct(null);
-      setIsPriceModalOpen(false);
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const soloNumeros = e.target.value.replace(/\D/g, '');
+    setForm(prev => ({ ...prev, precio_venta: soloNumeros }));
+  };
+
+  const handleCheckout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.id_metodo_pago) return alert("Seleccione método de pago");
+    if (!form.nombre_producto) return alert("Por favor, seleccione un tipo de joya.");
+    
+    // NUEVA VALIDACIÓN: Si es reversible, debe tener 2 piedras diferentes
+    if (form.es_reversible) {
+      if (!form.id_piedra || !form.id_piedra_secundaria) {
+        return alert("Debe seleccionar ambas piedras para una joya reversible.");
+      }
+      if (form.id_piedra === form.id_piedra_secundaria) {
+        return alert("Las piedras de ambos lados deben ser diferentes.");
+      }
     }
-  };
-
-  // Remover del carrito
-  const removeFromCart = (id: number) => {
-    setCart(cart.filter(c => c.id_producto !== id));
-  };
-
-  // --- 3. FINALIZAR VENTA (MODIFICADO) ---
-  const handleCheckout = async () => {
-    if (cart.length === 0) return alert("Carro vacío");
-    if (!selectedPago) return alert("Seleccione método de pago");
 
     try {
       setLoadingSale(true);
-      const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
-      await salesService.processSale(cart, selectedPago, total);
       
-      // EXITO:
-      setCart([]);
-      setSelectedPago(0);
-      refresh(); 
-      
-      // En lugar de alert, mostramos el modal bonito
-      setShowSuccess(true); // <--- ACTIVAR MODAL
+      const ventaData: CreateVentaDTO = {
+        nombre_producto: form.nombre_producto,
+        precio_venta: Number(form.precio_venta), 
+        cantidad: form.cantidad,
+        es_reversible: form.es_reversible,
+        id_metodo_pago: form.id_metodo_pago,
+        id_tipo: form.id_tipo,
+        id_material: form.id_material,
+        id_piedra: form.id_piedra,
+        id_piedra_secundaria: form.es_reversible ? form.id_piedra_secundaria : undefined,
+        id_usuario: session?.user?.id || ''
+      };
 
+      const success = await addVenta(ventaData);
+      
+      if (success) {
+        setForm({
+          nombre_producto: '', precio_venta: '', cantidad: 1, es_reversible: false,
+          id_metodo_pago: 0, id_tipo: 0, id_material: 0, id_piedra: 0, id_piedra_secundaria: 0
+        });
+        setShowSuccess(true);
+      }
     } catch (error: any) {
       alert("Error: " + error.message);
     } finally {
@@ -86,136 +112,173 @@ export default function SalesPage() {
     }
   };
 
-  const filteredProducts = products.filter(p => 
-    p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const formatDinero = (monto: number) => 
+    new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(monto);
 
-  const grandTotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
+  const formatFecha = (fechaStr: string) => 
+    new Date(fechaStr).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+
+  const precioFormateado = form.precio_venta 
+    ? `$ ${Number(form.precio_venta).toLocaleString('es-CL')}` 
+    : '';
+
+  const ventasHoy = ventas.slice(0, 8); 
+  const totalHoy = ventasHoy.reduce((sum, v) => sum + v.precio_venta, 0);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '20px', height: '100%', padding: '20px', boxSizing: 'border-box' }}>
       
-      {/* COLUMNA IZQUIERDA: CATÁLOGO */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', overflow: 'hidden' }}>
-        <input 
-          placeholder="🔍 Buscar joya por nombre o SKU..." 
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-          style={{ padding: '15px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1.1em', width: '100%', boxSizing: 'border-box' }}
-        />
+      {/* COLUMNA IZQUIERDA: CAJA REGISTRADORA */}
+      <div style={{ background: 'white', borderRadius: '12px', padding: '25px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
+        <h2 style={{ marginTop: 0, marginBottom: '20px', color: '#111827', borderBottom: '2px solid #f3f4f6', paddingBottom: '10px' }}>
+          🛒 Nueva Venta Rápida
+        </h2>
         
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '15px', overflowY: 'auto', paddingRight: '5px' }}>
-          {filteredProducts.map(p => (
-            <div 
-              key={p.id_producto} 
-              onClick={() => handleProductClick(p)}
-              style={{ 
-                background: 'white', padding: '15px', borderRadius: '8px', cursor: 'pointer', 
-                border: '1px solid #e5e7eb', transition: 'transform 0.1s, box-shadow 0.1s',
-                opacity: p.stock === 0 ? 0.6 : 1,
-                position: 'relative',
-                display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
-              }}
-              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-              onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-            >
+        <form onSubmit={handleCheckout} style={{ display: 'grid', gap: '20px', flex: 1 }}>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '15px' }}>
+            <div>
+              <label style={labelStyle}>¿Qué se vendió?</label>
+              <input 
+                name="nombre_producto" 
+                value={form.nombre_producto} 
+                readOnly 
+                required 
+                style={{...inputStyle, backgroundColor: '#f3f4f6', cursor: 'not-allowed', color: '#6b7280'}} 
+                placeholder="Se genera automáticamente..." 
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Cantidad</label>
+              <input name="cantidad" type="number" min="1" value={form.cantidad} onChange={handleChange} required style={inputStyle} />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div>
+              <label style={labelStyle}>Tipo</label>
+              <select name="id_tipo" value={form.id_tipo} onChange={handleChange} style={inputStyle} autoFocus>
+                <option value={0}>-- Selecciona --</option>
+                {catalogs.tipos.map(t => <option key={t.id_tipo} value={t.id_tipo}>{t.nombre_tipo}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Material</label>
+              <select name="id_material" value={form.id_material} onChange={handleChange} style={inputStyle}>
+                <option value={0}>-- Selecciona --</option>
+                {catalogs.materiales.map(m => <option key={m.id_material} value={m.id_material}>{m.nombre_material}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* CHECKBOX REVERSIBLE Y SELECCIÓN DE PIEDRAS */}
+          <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <label style={{...labelStyle, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '15px'}}>
+              <input name="es_reversible" type="checkbox" checked={form.es_reversible} onChange={handleChange} style={{ width: '18px', height: '18px' }} />
+              Es Reversible
+            </label>
+
+            <div style={{ display: 'grid', gridTemplateColumns: form.es_reversible ? '1fr 1fr' : '1fr', gap: '10px' }}>
               <div>
-                <div style={{ fontWeight: 'bold', color: '#1f2937' }}>{p.nombre}</div>
-                <div style={{ fontSize: '0.8em', color: '#6b7280', marginBottom: '8px' }}>{p.sku}</div>
+                <label style={labelStyle}>{form.es_reversible ? 'Piedra Lado A' : 'Piedra'}</label>
+                <select name="id_piedra" value={form.id_piedra} onChange={handleChange} style={inputStyle}>
+                  <option value={0}>-- Selecciona --</option>
+                  {catalogs.piedras
+                    // CAMBIO AQUÍ: Filtramos la piedra que ya está seleccionada en el Lado B
+                    .filter(p => form.es_reversible && form.id_piedra_secundaria != 0 ? p.id_piedra !== Number(form.id_piedra_secundaria) : true)
+                    .map(p => <option key={p.id_piedra} value={p.id_piedra}>{p.nombre_piedra}</option>)
+                  }
+                </select>
               </div>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 'bold', color: p.stock > 0 ? '#166534' : '#ef4444', fontSize: '0.85em', background: p.stock > 0 ? '#dcfce7' : '#fee2e2', padding: '2px 8px', borderRadius: '4px' }}>
-                  {p.stock} un.
-                </span>
-                <span style={{ 
-                  color: 'white', background: '#3b82f6', padding: '6px 12px', 
-                  borderRadius: '20px', fontSize: '0.8em', fontWeight: 'bold' 
-                }}>
-                  +
-                </span>
+
+              {form.es_reversible && (
+                <div>
+                  <label style={labelStyle}>Piedra Lado B</label>
+                  <select name="id_piedra_secundaria" value={form.id_piedra_secundaria} onChange={handleChange} style={inputStyle}>
+                    <option value={0}>-- Selecciona --</option>
+                    {catalogs.piedras
+                      // CAMBIO AQUÍ: Filtramos la piedra que ya está seleccionada en el Lado A
+                      .filter(p => form.id_piedra != 0 ? p.id_piedra !== Number(form.id_piedra) : true)
+                      .map(p => <option key={p.id_piedra} value={p.id_piedra}>{p.nombre_piedra}</option>)
+                    }
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ borderTop: '2px solid #f3f4f6', paddingTop: '20px', marginTop: 'auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+              <div>
+                <label style={{...labelStyle, color: '#16a34a'}}>Precio Total ($)</label>
+                <input 
+                  name="precio_venta" 
+                  type="text" 
+                  value={precioFormateado} 
+                  onChange={handlePriceChange} 
+                  required 
+                  style={{...inputStyle, borderColor: '#16a34a', fontSize: '1.2em', fontWeight: 'bold'}} 
+                  placeholder="$ 0" 
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Método de Pago</label>
+                <select name="id_metodo_pago" value={form.id_metodo_pago} onChange={handleChange} required style={{...inputStyle, fontSize: '1.1em', backgroundColor: '#f9fafb'}}>
+                  <option value={0}>Selecciona Pago</option>
+                  {metodosPago.map(p => <option key={p.id_pago} value={p.id_pago}>{p.tipo_pago}</option>)}
+                </select>
               </div>
             </div>
-          ))}
-        </div>
+
+            <button type="submit" disabled={loadingSale} style={btnSubmit}>
+              {loadingSale ? 'Procesando...' : '💰 Registrar Venta'}
+            </button>
+          </div>
+        </form>
       </div>
 
-      {/* COLUMNA DERECHA: CARRITO */}
-      <div style={{ background: 'white', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 20px rgba(0,0,0,0.05)', height: '100%', boxSizing: 'border-box' }}>
-        <h2 style={{ marginTop: 0, borderBottom: '1px solid #f3f4f6', paddingBottom: '15px' }}>🛒 Carrito</h2>
+      {/* COLUMNA DERECHA: ÚLTIMAS VENTAS */}
+      <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}>
+        <h2 style={{ marginTop: 0, borderBottom: '1px solid #cbd5e1', paddingBottom: '15px', fontSize: '1.2em', color: '#334155' }}>
+          📋 Últimas Ventas
+        </h2>
         
         <div style={{ flex: 1, overflowY: 'auto', marginBottom: '20px' }}>
-          {cart.length === 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9ca3af', gap: '10px' }}>
-              <span style={{ fontSize: '2em' }}>🛍️</span>
-              <p>Selecciona productos...</p>
-            </div>
-          ) : 
-            cart.map(item => (
-              <div key={item.id_producto} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', borderBottom: '1px solid #f3f4f6', paddingBottom: '10px' }}>
-                <div>
-                  <div style={{ fontWeight: '600', color: '#374151' }}>{item.nombre}</div>
-                  <div style={{ fontSize: '0.85em', color: '#6b7280' }}>
-                    {item.cantidadVenta} x ${(item.subtotal / item.cantidadVenta).toLocaleString('es-CL')}
-                  </div>
+          {ventasHoy.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: '50px' }}>No hay ventas recientes.</div>
+          ) : (
+            ventasHoy.map(v => (
+              <div key={v.id_venta} style={{ background: 'white', padding: '12px', borderRadius: '8px', marginBottom: '10px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 'bold', color: '#1e293b' }}>{v.nombre_producto}</span>
+                  <span style={{ fontWeight: 'bold', color: '#16a34a' }}>{formatDinero(v.precio_venta)}</span>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontWeight: 'bold', color: '#111827' }}>${item.subtotal.toLocaleString('es-CL')}</div>
-                  <button onClick={() => removeFromCart(item.id_producto)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75em', fontWeight: 'bold' }}>
-                    ELIMINAR
-                  </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8em', color: '#64748b' }}>
+                  <span>{formatFecha(v.fecha_venta)} • {v.metodo_pago?.tipo_pago}</span>
+                  <span>{v.cantidad} un.</span>
                 </div>
               </div>
             ))
-          }
+          )}
         </div>
 
-        <div style={{ borderTop: '2px solid #f3f4f6', paddingTop: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.4em', fontWeight: 'bold', marginBottom: '20px', color: '#1f2937' }}>
-            <span>Total</span>
-            <span>${grandTotal.toLocaleString('es-CL')}</span>
+        <div style={{ borderTop: '2px dashed #cbd5e1', paddingTop: '15px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2em', fontWeight: 'bold', color: '#0f172a' }}>
+            <span>Total Reciente</span>
+            <span>{formatDinero(totalHoy)}</span>
           </div>
-
-          <select 
-            value={selectedPago} 
-            onChange={e => setSelectedPago(Number(e.target.value))}
-            style={{ width: '100%', padding: '12px', marginBottom: '15px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1em', backgroundColor: '#f9fafb' }}
-          >
-            <option value={0}>Selecciona Método de Pago</option>
-            {pagos.map(p => <option key={p.id_pago} value={p.id_pago}>{p.tipo_pago}</option>)}
-          </select>
-
-          <button 
-            onClick={handleCheckout}
-            disabled={loadingSale}
-            style={{ 
-              width: '100%', padding: '15px', background: '#111827', color: 'white', 
-              border: 'none', borderRadius: '8px', fontSize: '1.1em', fontWeight: 'bold', cursor: loadingSale ? 'not-allowed' : 'pointer',
-              opacity: loadingSale ? 0.7 : 1, transition: 'background 0.2s'
-            }}
-          >
-            {loadingSale ? 'Procesando...' : 'Cobrar'}
-          </button>
         </div>
       </div>
 
-      {/* --- RENDERIZADO DE MODALES --- */}
-
-      <PriceModal 
-        isOpen={isPriceModalOpen}
-        onClose={() => { setIsPriceModalOpen(false); setPendingProduct(null); }}
-        onConfirm={handlePriceConfirm}
-        productName={pendingProduct?.nombre || ''}
-      />
-
-      {/* Nuevo Modal de Éxito */}
       <SuccessModal 
         isOpen={showSuccess}
         onClose={() => setShowSuccess(false)}
-        message="Venta registrada y stock actualizado."
+        message="Venta registrada exitosamente."
       />
-
     </div>
   );
 }
+
+const inputStyle = { padding: '12px', borderRadius: '6px', border: '1px solid #d1d5db', width: '100%', boxSizing: 'border-box' as const, fontSize: '1em' };
+const labelStyle = { display: 'block', marginBottom: '6px', fontSize: '0.9em', color: '#4b5563', fontWeight: 'bold' };
+const btnSubmit = { width: '100%', padding: '15px', background: '#111827', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2em', fontWeight: 'bold', cursor: 'pointer', transition: 'background 0.2s' };

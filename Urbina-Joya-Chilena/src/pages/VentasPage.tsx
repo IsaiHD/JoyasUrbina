@@ -3,6 +3,7 @@ import { useVentas } from '../hooks/useVentas';
 import { useAuth } from '../hooks/useAuth';
 import type { CreateVentaDTO } from '../types/ventas.types';
 import SuccessModal from '../components/CompraExitoModal'; 
+import './VentasPage.css'; // <--- IMPORTAMOS EL CSS AQUI
 
 export default function VentasPage() {
   const { ventas, catalogs, metodosPago, addVenta } = useVentas();
@@ -23,7 +24,6 @@ export default function VentasPage() {
     id_piedra_secundaria: 0
   });
 
-  // --- AUTO-GENERADOR DE NOMBRE ---
   useEffect(() => {
     const idTipo = Number(form.id_tipo);
     const idMat = Number(form.id_material);
@@ -70,7 +70,6 @@ export default function VentasPage() {
     if (!form.id_metodo_pago) return alert("Seleccione método de pago");
     if (!form.nombre_producto) return alert("Por favor, seleccione un tipo de joya.");
     
-    // NUEVA VALIDACIÓN: Si es reversible, debe tener 2 piedras diferentes
     if (form.es_reversible) {
       if (!form.id_piedra || !form.id_piedra_secundaria) {
         return alert("Debe seleccionar ambas piedras para una joya reversible.");
@@ -126,7 +125,7 @@ export default function VentasPage() {
   const totalHoy = ventasHoy.reduce((sum, v) => sum + v.precio_venta, 0);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '20px', height: '100%', padding: '20px', boxSizing: 'border-box' }}>
+    <div className="ventas-container">
       
       {/* COLUMNA IZQUIERDA: CAJA REGISTRADORA */}
       <div style={{ background: 'white', borderRadius: '12px', padding: '25px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
@@ -136,7 +135,7 @@ export default function VentasPage() {
         
         <form onSubmit={handleCheckout} style={{ display: 'grid', gap: '20px', flex: 1 }}>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '15px' }}>
+          <div className="form-row-2-1">
             <div>
               <label style={labelStyle}>¿Qué se vendió?</label>
               <input 
@@ -154,10 +153,10 @@ export default function VentasPage() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div className="form-row-1-1">
             <div>
               <label style={labelStyle}>Tipo</label>
-              <select name="id_tipo" value={form.id_tipo} onChange={handleChange} style={inputStyle} autoFocus>
+              <select name="id_tipo" value={form.id_tipo} onChange={handleChange} style={inputStyle}>
                 <option value={0}>-- Selecciona --</option>
                 {catalogs.tipos.map(t => <option key={t.id_tipo} value={t.id_tipo}>{t.nombre_tipo}</option>)}
               </select>
@@ -171,20 +170,18 @@ export default function VentasPage() {
             </div>
           </div>
 
-          {/* CHECKBOX REVERSIBLE Y SELECCIÓN DE PIEDRAS */}
           <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
             <label style={{...labelStyle, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '15px'}}>
               <input name="es_reversible" type="checkbox" checked={form.es_reversible} onChange={handleChange} style={{ width: '18px', height: '18px' }} />
               Es Reversible
             </label>
 
-            <div style={{ display: 'grid', gridTemplateColumns: form.es_reversible ? '1fr 1fr' : '1fr', gap: '10px' }}>
+            <div className={form.es_reversible ? "form-row-1-1" : ""}>
               <div>
                 <label style={labelStyle}>{form.es_reversible ? 'Piedra Lado A' : 'Piedra'}</label>
                 <select name="id_piedra" value={form.id_piedra} onChange={handleChange} style={inputStyle}>
                   <option value={0}>-- Selecciona --</option>
                   {catalogs.piedras
-                    // CAMBIO AQUÍ: Filtramos la piedra que ya está seleccionada en el Lado B
                     .filter(p => form.es_reversible && form.id_piedra_secundaria != 0 ? p.id_piedra !== Number(form.id_piedra_secundaria) : true)
                     .map(p => <option key={p.id_piedra} value={p.id_piedra}>{p.nombre_piedra}</option>)
                   }
@@ -197,7 +194,6 @@ export default function VentasPage() {
                   <select name="id_piedra_secundaria" value={form.id_piedra_secundaria} onChange={handleChange} style={inputStyle}>
                     <option value={0}>-- Selecciona --</option>
                     {catalogs.piedras
-                      // CAMBIO AQUÍ: Filtramos la piedra que ya está seleccionada en el Lado A
                       .filter(p => form.id_piedra != 0 ? p.id_piedra !== Number(form.id_piedra) : true)
                       .map(p => <option key={p.id_piedra} value={p.id_piedra}>{p.nombre_piedra}</option>)
                     }
@@ -208,7 +204,7 @@ export default function VentasPage() {
           </div>
 
           <div style={{ borderTop: '2px solid #f3f4f6', paddingTop: '20px', marginTop: 'auto' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+            <div className="form-row-1-1" style={{ marginBottom: '20px' }}>
               <div>
                 <label style={{...labelStyle, color: '#16a34a'}}>Precio Total ($)</label>
                 <input 

@@ -1,0 +1,36 @@
+/* Contenedor principal: Izquierda caja, Derecha ticket */
+.ventas-container {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  gap: 20px;
+  height: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* Filas del formulario */
+.form-row-2-1 {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 15px;
+}
+
+.form-row-1-1 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* MAGIA PARA CELULARES */
+@media (max-width: 800px) {
+  .ventas-container {
+    grid-template-columns: 1fr; /* Todo en una sola columna hacia abajo */
+    height: auto;
+    padding: 10px;
+  }
+
+  .form-row-2-1,
+  .form-row-1-1 {
+    grid-template-columns: 1fr; /* Los inputs también se apilan uno bajo el otro */
+  }
+}

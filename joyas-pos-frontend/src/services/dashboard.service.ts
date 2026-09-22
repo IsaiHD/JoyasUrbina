@@ -34,7 +34,7 @@ export const dashboardService = {
     }
 
     if (recentSales) {
-      recentSales.forEach(sale => {
+      recentSales.forEach((sale: { fecha_venta: string | number | Date; precio_venta: number; nombre_producto: string; }) => {
         const saleDate = new Date(sale.fecha_venta);
         const dayName = saleDate.toLocaleDateString('es-CL', { weekday: 'short' });
         

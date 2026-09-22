@@ -5,7 +5,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/gin-gonic/gin" // 1. Asegúrate de tener esta línea
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 
@@ -15,7 +16,6 @@ import (
 )
 
 func main() {
-
 	if err := godotenv.Overload(); err != nil {
 		log.Println("[WARN] No se encontró el archivo .env, leyendo variables del sistema")
 	}
@@ -41,24 +41,32 @@ func main() {
 	}
 	log.Println("[OK] Conectado a PostgreSQL exitosamente")
 
-	// 2. Instanciación de Repositorios (Adaptadores secundarios)
+	// Instanciación de Repositorios (Adaptadores secundarios)
 	ventasRepo := postgres.NewVentasRepo(db)
 	dashRepo := postgres.NewDashboardRepo(db)
 
 	mpToken := os.Getenv("MP_ACCESS_TOKEN")
 	mpClient := mercadopago.NewClient(mpToken)
 
-	// 3. Instanciación de Controladores (Adaptadores primarios)
+	// Instanciación de Controladores (Adaptadores primarios)
 	apiHandler := handlers.NewAPIHandler(ventasRepo, dashRepo)
-	webhookHandler := handlers.NewGinHandler(mpClient, nil) // El webhook usa su propia lógica
+	webhookHandler := handlers.NewGinHandler(mpClient, nil)
 
-	// 4. Configuración del Router Gin
+	// Configuración del Router Gin
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 
+	// --- CONFIGURACIÓN DE CORS ---
+	config := cors.DefaultConfig()
+	config.AllowAllOrigins = true // Permite peticiones desde cualquier origen (Frontend local o en producción)
+	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
+	router.Use(cors.New(config))
+	// -----------------------------
+
 	// Rutas Públicas (No requieren JWT)
 	router.GET("/health", webhookHandler.HealthCheck)
-	router.POST("/webhook", webhookHandler.HandleWebhook) // MercadoPago no envía tu JWT
+	router.POST("/webhook", webhookHandler.HandleWebhook)
 
 	// Rutas Protegidas (Requieren sesión de usuario válida)
 	api := router.Group("/api/v1")

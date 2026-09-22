@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useVentas } from '../hooks/useVentas';
 import { useAuth } from '../hooks/useAuth';
-import type { CreateVentaDTO, PagoTransaccion } from '../types/ventas.types';
+import type { CreateVentaDTO } from '../types/ventas.types';
 import SuccessModal from '../components/CompraExitoModal';
 import { AsignarProductoModal } from '../components/AsignarProductoModal';
-import { supabase } from '../supabaseClient';
 import './VentasPage.css';
 
 export default function VentasPage() {
@@ -13,7 +12,9 @@ export default function VentasPage() {
 
   const [loadingSale, setLoadingSale] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [pagoPendiente, setPagoPendiente] = useState<PagoTransaccion | null>(null);
+  // Nota: Si en el futuro necesitas manejar pagos pendientes por polling o WebSockets desde tu API de Go, 
+  // puedes enlazarlo aquí en lugar de usar Realtime directo de Supabase.
+  const [pagoPendiente] = useState(null); 
 
   const [form, setForm] = useState({
     nombre_producto: '',
@@ -26,27 +27,6 @@ export default function VentasPage() {
     id_piedra: 0,
     id_piedra_secundaria: 0
   });
-
-  // Escucha en tiempo real de cobros aprobados desde la máquina Mercado Pago Point
-  useEffect(() => {
-    const canal = supabase
-      .channel('cobros-point-pendientes')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'pago_transaccion' },
-        (payload) => {
-          const nuevaTransaccion = payload.new as PagoTransaccion;
-          if (nuevaTransaccion.estado_vinculacion === 'PENDIENTE') {
-            setPagoPendiente(nuevaTransaccion);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(canal);
-    };
-  }, []);
 
   useEffect(() => {
     const idTipo = Number(form.id_tipo);
@@ -297,10 +277,10 @@ export default function VentasPage() {
         message="Venta registrada exitosamente."
       />
 
-      {/* Modal reactivo que aparece automáticamente al cobrar en la máquina Point */}
+      {/* Modal para asignar producto si llega un pago Point */}
       <AsignarProductoModal 
         pago={pagoPendiente} 
-        onClose={() => setPagoPendiente(null)} 
+        onClose={() => {}} 
         onVentaCompletada={() => {
           setShowSuccess(true);
         }} 

@@ -3,25 +3,22 @@ import { useAuth } from '../hooks/useAuth';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
-import * as XLSX from 'xlsx'; // <--- 1. Importa esto arriba
+import * as XLSX from 'xlsx';
 import KpiCard from '../components/KpiCard/KpiCard'; 
 
 const BAR_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#6366f1'];
 
 const exportarExcel = () => {
-  // 1. Preparamos los datos
   const datos = [
     { Concepto: "Ingresos Estimados (Mes Actual)", Monto: 1500000 },
     { Concepto: "Ingresos Proyectados (Mes + 1)", Monto: 1800000 },
     { Concepto: "Ingresos Proyectados (Mes + 2)", Monto: 2100000 },
   ];
 
-  // 2. Creamos la hoja de cálculo
   const worksheet = XLSX.utils.json_to_sheet(datos);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Proyección");
 
-  // 3. Forzamos la descarga
   XLSX.writeFile(workbook, "Proyeccion_Ingresos.xlsx");
 };
 
@@ -51,11 +48,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function DashboardPage() {
-  const { stats, loading } = useDashboard();
+  // Extraemos las propiedades directo del hook (sin el objeto intermedio 'stats')
+  const { revenueToday, salesCount, salesLast7Days, productNamesList, loading, error } = useDashboard();
   const { role } = useAuth();
-
   if (role !== 'admin') return <div style={{ padding: '20px', color: 'red' }}>⛔ Acceso Restringido</div>;
   if (loading) return <div style={{ padding: '20px' }}>🔄 Cargando métricas...</div>;
+  if (error) return <div style={{ padding: '20px', color: 'red' }}>⚠️ Error: {error}</div>;
 
   return (
     <div style={{ padding: '20px', boxSizing: 'border-box' }}>
@@ -66,8 +64,8 @@ export default function DashboardPage() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '30px' }}>
-        <KpiCard title="INGRESOS DE HOY" value={`$${stats.revenueToday.toLocaleString('es-CL')}`} icon="💰" color="#10b981" />
-        <KpiCard title="JOYAS VENDIDAS HOY" value={stats.salesCount} icon="🛍️" color="#3b82f6" />
+        <KpiCard title="INGRESOS DE HOY" value={`$${revenueToday.toLocaleString('es-CL')}`} icon="💰" color="#10b981" />
+        <KpiCard title="JOYAS VENDIDAS HOY" value={salesCount} icon="🛍️" color="#3b82f6" />
       </div>
 
       <div style={{ background: 'white', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid #f3f4f6' }}>
@@ -75,14 +73,14 @@ export default function DashboardPage() {
 
         <div style={{ height: '400px', width: '100%' }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={stats.salesLast7Days} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            <BarChart data={salesLast7Days} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12 }} dy={10} />
               <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12 }} tickFormatter={(value) => `$${value.toLocaleString('es-CL')}`} />
               
               <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f9fafb' }} />
 
-              {stats.productNamesList.map((productName, index) => (
+              {productNamesList.map((productName, index) => (
                 <Bar
                   key={productName}
                   dataKey={productName}
@@ -90,14 +88,15 @@ export default function DashboardPage() {
                   fill={BAR_COLORS[index % BAR_COLORS.length]}
                   barSize={40}
                   name={productName}
-                  radius={index === stats.productNamesList.length - 1 ? [4, 4, 0, 0] : [0,0,0,0]}
+                  radius={index === productNamesList.length - 1 ? [4, 4, 0, 0] : [0,0,0,0]}
                 />
               ))}
 
             </BarChart>
           </ResponsiveContainer>
         </div>
-        {/* PROYECCIÓN MENSUAL PEQUEÑA CON DESCARGA */}
+
+        {/* PROYECCIÓN MENSUAL CON DESCARGA */}
         <div style={{ 
           background: '#eff6ff', padding: '20px', borderRadius: '12px', 
           border: '1px solid #bfdbfe', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px'

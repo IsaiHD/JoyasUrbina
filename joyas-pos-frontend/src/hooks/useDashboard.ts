@@ -1,37 +1,56 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { dashboardService } from '../services/dashboard.service';
 
-export interface DashboardStats {
-  revenueToday: number;
-  salesCount: number;
-  salesLast7Days: any[];
-  productNamesList: string[];
-}
-
 export function useDashboard() {
-  const [stats, setStats] = useState<DashboardStats>({
+  const [stats, setStats] = useState({
     revenueToday: 0,
     salesCount: 0,
-    salesLast7Days: [],
-    productNamesList: []
+    salesLast7Days: [] as any[],
+    productNamesList: [] as string[]
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const data = await dashboardService.getStats();
-        setStats(data);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchStats = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await dashboardService.getStats();
 
-    fetchStats();
+      if (data && data.salesLast7Days && data.productNamesList) {
+        // Normalizamos los días para que CADA día tenga todos los productos de la lista en 0 si no se vendieron
+        const normalizedSales = data.salesLast7Days.map((dayObj: any) => {
+          const completeDay = { ...dayObj };
+          data.productNamesList.forEach((prodName: string) => {
+            if (!(prodName in completeDay)) {
+              completeDay[prodName] = 0;
+            }
+          });
+          return completeDay;
+        });
+
+        setStats({
+          revenueToday: data.revenueToday || 0,
+          salesCount: data.salesCount || 0,
+          salesLast7Days: normalizedSales,
+          productNamesList: data.productNamesList || []
+        });
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error al cargar estadísticas');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  return { stats, loading, error };
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  return {
+    ...stats,
+    loading,
+    error,
+    refetch: fetchStats
+  };
 }

@@ -13,8 +13,8 @@ type Venta struct {
 	IDMetodoPago       int       `json:"id_metodo_pago"`
 	IDTipo             int       `json:"id_tipo,omitempty"`
 	IDMaterial         int       `json:"id_material,omitempty"`
-	IDPiedra           int       `json:"id_piedra,omitempty"`
-	IDPiedraSecundaria int       `json:"id_piedra_secundaria,omitempty"`
+	IDPiedra           *int      `json:"id_piedra,omitempty"`            // Cambiado a puntero *int
+	IDPiedraSecundaria *int      `json:"id_piedra_secundaria,omitempty"` // Cambiado a puntero *int
 	IDUsuario          string    `json:"id_usuario,omitempty"`
 	PaymentID          string    `json:"payment_id,omitempty"`
 	Cuotas             int       `json:"cuotas,omitempty"`

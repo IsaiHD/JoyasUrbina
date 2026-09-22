@@ -67,6 +67,9 @@ func (r *DashboardRepo) GetDashboardStats(ctx context.Context) (*domain.Dashboar
 			dayMap[producto] = currentVal + precio
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	// Convertir sets y mapas a slices/arrays para JSON
 	var productNamesList []string

@@ -1,20 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useVentas } from '../hooks/useVentas';
 import { useAuth } from '../hooks/useAuth';
-import type { CreateVentaDTO } from '../types/ventas.types';
-import SuccessModal from '../components/CompraExitoModal'; 
-import './VentasPage.css'; // <--- IMPORTAMOS EL CSS AQUI
+import type { CreateVentaDTO, PagoTransaccion } from '../types/ventas.types';
+import SuccessModal from '../components/CompraExitoModal';
+import { AsignarProductoModal } from '../components/AsignarProductoModal';
+import { supabase } from '../supabaseClient';
+import './VentasPage.css';
 
 export default function VentasPage() {
   const { ventas, catalogs, metodosPago, addVenta } = useVentas();
   const { session } = useAuth();
-  
+
   const [loadingSale, setLoadingSale] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [pagoPendiente, setPagoPendiente] = useState<PagoTransaccion | null>(null);
 
   const [form, setForm] = useState({
     nombre_producto: '',
-    precio_venta: '', 
+    precio_venta: '',
     cantidad: 1,
     es_reversible: false,
     id_metodo_pago: 0,
@@ -23,6 +26,27 @@ export default function VentasPage() {
     id_piedra: 0,
     id_piedra_secundaria: 0
   });
+
+  // Escucha en tiempo real de cobros aprobados desde la máquina Mercado Pago Point
+  useEffect(() => {
+    const canal = supabase
+      .channel('cobros-point-pendientes')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'pago_transaccion' },
+        (payload) => {
+          const nuevaTransaccion = payload.new as PagoTransaccion;
+          if (nuevaTransaccion.estado_vinculacion === 'PENDIENTE') {
+            setPagoPendiente(nuevaTransaccion);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(canal);
+    };
+  }, []);
 
   useEffect(() => {
     const idTipo = Number(form.id_tipo);
@@ -56,7 +80,7 @@ export default function VentasPage() {
     const { name, value, type, tagName, checked } = e.target;
     const val = type === 'checkbox' ? checked : 
                 (type === 'number' || tagName === 'SELECT') ? Number(value) : value;
-    
+
     setForm(prev => ({ ...prev, [name]: val }));
   };
 
@@ -69,7 +93,7 @@ export default function VentasPage() {
     e.preventDefault();
     if (!form.id_metodo_pago) return alert("Seleccione método de pago");
     if (!form.nombre_producto) return alert("Por favor, seleccione un tipo de joya.");
-    
+
     if (form.es_reversible) {
       if (!form.id_piedra || !form.id_piedra_secundaria) {
         return alert("Debe seleccionar ambas piedras para una joya reversible.");
@@ -81,10 +105,10 @@ export default function VentasPage() {
 
     try {
       setLoadingSale(true);
-      
+
       const ventaData: CreateVentaDTO = {
         nombre_producto: form.nombre_producto,
-        precio_venta: Number(form.precio_venta), 
+        precio_venta: Number(form.precio_venta),
         cantidad: form.cantidad,
         es_reversible: form.es_reversible,
         id_metodo_pago: form.id_metodo_pago,
@@ -96,7 +120,7 @@ export default function VentasPage() {
       };
 
       const success = await addVenta(ventaData);
-      
+
       if (success) {
         setForm({
           nombre_producto: '', precio_venta: '', cantidad: 1, es_reversible: false,
@@ -121,20 +145,20 @@ export default function VentasPage() {
     ? `$ ${Number(form.precio_venta).toLocaleString('es-CL')}` 
     : '';
 
-  const ventasHoy = ventas.slice(0, 8); 
+  const ventasHoy = ventas.slice(0, 8);
   const totalHoy = ventasHoy.reduce((sum, v) => sum + v.precio_venta, 0);
 
   return (
     <div className="ventas-container">
-      
-      {/* COLUMNA IZQUIERDA: CAJA REGISTRADORA */}
+
+      {/* COLUMNA IZQUIERDA: CAJA REGISTRADORA MANUAL */}
       <div style={{ background: 'white', borderRadius: '12px', padding: '25px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
         <h2 style={{ marginTop: 0, marginBottom: '20px', color: '#111827', borderBottom: '2px solid #f3f4f6', paddingBottom: '10px' }}>
           🛒 Nueva Venta Rápida
         </h2>
-        
+
         <form onSubmit={handleCheckout} style={{ display: 'grid', gap: '20px', flex: 1 }}>
-          
+
           <div className="form-row-2-1">
             <div>
               <label style={labelStyle}>¿Qué se vendió?</label>
@@ -182,7 +206,7 @@ export default function VentasPage() {
                 <select name="id_piedra" value={form.id_piedra} onChange={handleChange} style={inputStyle}>
                   <option value={0}>-- Selecciona --</option>
                   {catalogs.piedras
-                    .filter(p => form.es_reversible && form.id_piedra_secundaria != 0 ? p.id_piedra !== Number(form.id_piedra_secundaria) : true)
+                    .filter(p => form.es_reversible && form.id_piedra_secundaria !== 0 ? p.id_piedra !== Number(form.id_piedra_secundaria) : true)
                     .map(p => <option key={p.id_piedra} value={p.id_piedra}>{p.nombre_piedra}</option>)
                   }
                 </select>
@@ -194,7 +218,7 @@ export default function VentasPage() {
                   <select name="id_piedra_secundaria" value={form.id_piedra_secundaria} onChange={handleChange} style={inputStyle}>
                     <option value={0}>-- Selecciona --</option>
                     {catalogs.piedras
-                      .filter(p => form.id_piedra != 0 ? p.id_piedra !== Number(form.id_piedra) : true)
+                      .filter(p => form.id_piedra !== 0 ? p.id_piedra !== Number(form.id_piedra) : true)
                       .map(p => <option key={p.id_piedra} value={p.id_piedra}>{p.nombre_piedra}</option>)
                     }
                   </select>
@@ -238,7 +262,7 @@ export default function VentasPage() {
         <h2 style={{ marginTop: 0, borderBottom: '1px solid #cbd5e1', paddingBottom: '15px', fontSize: '1.2em', color: '#334155' }}>
           📋 Últimas Ventas
         </h2>
-        
+
         <div style={{ flex: 1, overflowY: 'auto', marginBottom: '20px' }}>
           {ventasHoy.length === 0 ? (
             <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: '50px' }}>No hay ventas recientes.</div>
@@ -266,10 +290,20 @@ export default function VentasPage() {
         </div>
       </div>
 
+      {/* Modal de éxito de venta manual */}
       <SuccessModal 
         isOpen={showSuccess}
         onClose={() => setShowSuccess(false)}
         message="Venta registrada exitosamente."
+      />
+
+      {/* Modal reactivo que aparece automáticamente al cobrar en la máquina Point */}
+      <AsignarProductoModal 
+        pago={pagoPendiente} 
+        onClose={() => setPagoPendiente(null)} 
+        onVentaCompletada={() => {
+          setShowSuccess(true);
+        }} 
       />
     </div>
   );

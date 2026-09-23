@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useVentas } from '../hooks/useVentas';
 import { useAuth } from '../hooks/useAuth';
-import type { CreateVentaDTO } from '../types/ventas.types';
+import type { CreateVentaDTO, PagoTransaccion } from '../types/ventas.types';
 import SuccessModal from '../components/CompraExitoModal';
 import { AsignarProductoModal } from '../components/AsignarProductoModal';
+import { supabase } from '../supabaseClient';
 import './VentasPage.css';
 
 export default function VentasPage() {
@@ -12,9 +13,31 @@ export default function VentasPage() {
 
   const [loadingSale, setLoadingSale] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  // Nota: Si en el futuro necesitas manejar pagos pendientes por polling o WebSockets desde tu API de Go, 
-  // puedes enlazarlo aquí en lugar de usar Realtime directo de Supabase.
-  const [pagoPendiente] = useState(null); 
+  const [pagoPendiente, setPagoPendiente] = useState<PagoTransaccion | null>(null);
+
+  // Escucha en tiempo real la tabla pago_transaccion vía Supabase Realtime.
+  // Cuando el backend Go inserta un pago aprobado, esto dispara el modal
+  // para asignarle un producto. Las columnas del INSERT (backend Go) ya
+  // coinciden 1:1 con PagoTransaccion, así que el payload.new se castea
+  // directo sin necesidad de mapeos.
+  useEffect(() => {
+    const channel = supabase
+      .channel('pagos-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'pago_transaccion' },
+        (payload) => {
+          const row = payload.new as PagoTransaccion;
+          if (row.estado_vinculacion !== 'PENDIENTE') return;
+          setPagoPendiente(row);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const [form, setForm] = useState({
     nombre_producto: '',
@@ -280,8 +303,9 @@ export default function VentasPage() {
       {/* Modal para asignar producto si llega un pago Point */}
       <AsignarProductoModal 
         pago={pagoPendiente} 
-        onClose={() => {}} 
+        onClose={() => setPagoPendiente(null)} 
         onVentaCompletada={() => {
+          setPagoPendiente(null);
           setShowSuccess(true);
         }} 
       />

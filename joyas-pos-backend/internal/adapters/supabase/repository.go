@@ -27,7 +27,11 @@ func NewRepository(url, apiKey string) ports.TransactionRepository {
 }
 
 func (r *Repository) SaveTransaction(ctx context.Context, tx *domain.PaymentTransaction) error {
-	endpoint := fmt.Sprintf("%s/rest/v1/pago_transaccion", r.url)
+	// on_conflict=payment_id le dice a PostgREST contra qué columna resolver
+	// el "merge-duplicates". Sin esto, el upsert cae por default sobre la
+	// primary key (normalmente "id"), que nunca se repite, así que la
+	// idempotencia real depende de esto + el UNIQUE constraint en la BBDD.
+	endpoint := fmt.Sprintf("%s/rest/v1/pago_transaccion?on_conflict=payment_id", r.url)
 	body, err := json.Marshal(tx)
 	if err != nil {
 		return err

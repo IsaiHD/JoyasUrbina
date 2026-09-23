@@ -13,6 +13,7 @@ import (
 	"joyas-urbina-backend/internal/adapters/handlers"
 	"joyas-urbina-backend/internal/adapters/mercadopago"
 	"joyas-urbina-backend/internal/adapters/postgres"
+	"joyas-urbina-backend/internal/adapters/supabase"
 )
 
 func main() {
@@ -48,9 +49,19 @@ func main() {
 	mpToken := os.Getenv("MP_ACCESS_TOKEN")
 	mpClient := mercadopago.NewClient(mpToken)
 
+	// Repositorio de Supabase para pago_transaccion (usado por el webhook de MP).
+	// Debe usar la SERVICE ROLE KEY (no la anon key) para poder insertar sin
+	// pasar por RLS, ya que este INSERT no tiene sesión de usuario asociada.
+	supabaseURL := os.Getenv("SUPABASE_URL")
+	supabaseServiceKey := os.Getenv("SUPABASE_SERVICE_ROLE_KEY")
+	if supabaseURL == "" || supabaseServiceKey == "" {
+		log.Fatal("Faltan las variables de entorno SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY")
+	}
+	transactionRepo := supabase.NewRepository(supabaseURL, supabaseServiceKey)
+
 	// Instanciación de Controladores (Adaptadores primarios)
 	apiHandler := handlers.NewAPIHandler(ventasRepo, dashRepo)
-	webhookHandler := handlers.NewGinHandler(mpClient, nil)
+	webhookHandler := handlers.NewGinHandler(mpClient, transactionRepo)
 
 	// Configuración del Router Gin
 	gin.SetMode(gin.ReleaseMode)
@@ -83,6 +94,10 @@ func main() {
 
 		// Módulo Dashboard
 		api.GET("/dashboard/stats", apiHandler.GetDashboardStats)
+
+		// El aviso en tiempo real al frontend ahora lo maneja Supabase
+		// Realtime, escuchando directo la tabla pago_transaccion.
+
 	}
 
 	log.Printf("Iniciando API Joyas Urbina con Gin en puerto %s...", port)

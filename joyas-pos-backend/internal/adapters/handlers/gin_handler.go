@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"sync"
+	"time"
 
 	"joyas-urbina-backend/internal/core/domain"
 	"joyas-urbina-backend/internal/core/ports"
@@ -79,8 +80,7 @@ func (h *GinHandler) HandleWebhook(c *gin.Context) {
 		go func(paymentID string) {
 			defer unlockPayment(paymentID)
 
-			// Nota: Como estamos en una gorutina, es mejor crear un contexto nuevo
-			// porque el c.Request.Context() se cancela al terminar la petición HTTP original.
+			// Contexto nuevo e independiente del ciclo de vida HTTP
 			ctx := context.Background()
 
 			detail, err := h.mpClient.GetPayment(ctx, paymentID)
@@ -90,8 +90,6 @@ func (h *GinHandler) HandleWebhook(c *gin.Context) {
 			}
 
 			if detail.Status == "approved" {
-				// installment_amount / net_received_amount vienen de MP; si no
-				// vinieran (ej. pagos en 1 cuota a veces los omite), se calculan.
 				montoCuota := detail.TransactionDetails.InstallmentAmount
 				if montoCuota == 0 && detail.Installments > 0 {
 					montoCuota = detail.TransactionAmt / float64(detail.Installments)
@@ -99,6 +97,14 @@ func (h *GinHandler) HandleWebhook(c *gin.Context) {
 				montoLiquido := detail.TransactionDetails.NetReceivedAmount
 				if montoLiquido == 0 {
 					montoLiquido = detail.TransactionAmt
+				}
+
+				// Determinar la fecha real en que el cliente pagó en el terminal Point
+				fechaReal := time.Now()
+				if detail.DateApproved != nil {
+					fechaReal = *detail.DateApproved
+				} else if detail.DateCreated != nil {
+					fechaReal = *detail.DateCreated
 				}
 
 				tx := domain.PaymentTransaction{
@@ -110,16 +116,15 @@ func (h *GinHandler) HandleWebhook(c *gin.Context) {
 					MetodoPago:        detail.PaymentTypeID,
 					TipoTarjeta:       detail.PaymentMethodID,
 					EstadoVinculacion: "PENDIENTE",
+					CreadoEn:          fechaReal, // <-- Fecha real de la máquina Point
 				}
 
-				// SaveTransaction hace upsert (merge-duplicates + on_conflict
-				// sobre payment_id): si MP reenvía el webhook, esto actualiza
-				// la fila existente en vez de duplicarla.
+				// Guarda la transacción en Supabase
 				if err := h.supabaseRepo.SaveTransaction(ctx, &tx); err != nil {
 					log.Printf("[ERROR] Persistir pago en Supabase: %v\n", err)
 					return
 				}
-				log.Printf("[OK] Pago aprobado %s registrado exitosamente.\n", paymentID)
+				log.Printf("[OK] Pago aprobado %s registrado exitosamente con fecha real %s\n", paymentID, fechaReal.Format(time.RFC3339))
 			}
 		}(paymentID)
 	}

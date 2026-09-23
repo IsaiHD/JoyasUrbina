@@ -44,7 +44,7 @@ export interface Venta {
   tipo_joyas?: TipoJoya;
   material?: Material;
   piedra?: Piedra;
-  piedra_principal?: Piedra; // Coincide con el alias en el SELECT
+  piedra_principal?: Piedra; 
   piedra_secundaria?: Piedra;
   metodo_pago?: MetodoPago;
 }
@@ -88,4 +88,27 @@ export interface VentaPayload {
   id_piedra_secundaria?: number;
   payment_id: string;
   cuotas: number;
+}
+
+// ============================================================================
+// TIPOS NUEVOS PARA VINCULACIÓN MULTI-PRODUCTO (BATCH)
+// ============================================================================
+
+export interface ItemVentaBatch {
+  nombre_producto: string;
+  sku_joya?: string;
+  precio_venta: number;
+  cantidad: number;
+  es_reversible?: boolean;
+  id_tipo?: number;
+  id_material?: number;
+  id_piedra?: number | null;
+  id_piedra_secundaria?: number | null;
+}
+
+export interface VincularPagoBatchDTO {
+  payment_id: string;
+  id_metodo_pago: number;
+  cuotas: number;
+  items: ItemVentaBatch[];
 }

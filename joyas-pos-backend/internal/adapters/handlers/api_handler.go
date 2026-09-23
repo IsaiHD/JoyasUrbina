@@ -20,25 +20,29 @@ func NewAPIHandler(v ports.VentasRepository, d ports.DashboardRepository) *APIHa
 
 // POST /api/v1/ventas/vincular
 func (h *APIHandler) VincularPago(c *gin.Context) {
-	var req struct {
-		Venta         domain.Venta `json:"venta"`
-		TransaccionID int          `json:"transaccion_id"`
-	}
-
+	var req domain.VincularPagoBatchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "JSON inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "JSON de vinculación inválido: " + err.Error()})
 		return
 	}
 
-	// Obtener ID del usuario desde el JWT (previamente inyectado por el Middleware de Auth)
-	req.Venta.IDUsuario = c.GetString("userID")
+	// Obtener ID del usuario desde el middleware de autenticación
+	userID := c.GetString("userID")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Usuario no autenticado"})
+		return
+	}
 
-	if err := h.ventasRepo.VincularPagoConVenta(c.Request.Context(), &req.Venta, req.TransaccionID); err != nil {
+	if err := h.ventasRepo.VincularPagoBatch(c.Request.Context(), userID, &req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "Vinculación exitosa"})
+	c.JSON(http.StatusOK, gin.H{
+		"status":          "Vinculación exitosa",
+		"payment_id":      req.PaymentID,
+		"total_productos": len(req.Items),
+	})
 }
 
 // GET /api/v1/dashboard/stats
@@ -52,10 +56,6 @@ func (h *APIHandler) GetDashboardStats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
-// ====================================================================
-// MÉTODOS FALTANTES AÑADIDOS
-// ====================================================================
-
 // GET /api/v1/ventas
 func (h *APIHandler) GetVentas(c *gin.Context) {
 	ventas, err := h.ventasRepo.GetVentas(c.Request.Context())
@@ -64,7 +64,6 @@ func (h *APIHandler) GetVentas(c *gin.Context) {
 		return
 	}
 
-	// Si es nulo, devolvemos un array vacío para no romper el frontend de React
 	if ventas == nil {
 		ventas = []domain.Venta{}
 	}
@@ -76,11 +75,10 @@ func (h *APIHandler) GetVentas(c *gin.Context) {
 func (h *APIHandler) CreateVenta(c *gin.Context) {
 	var venta domain.Venta
 	if err := c.ShouldBindJSON(&venta); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "JSON de venta inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "JSON de venta inválido: " + err.Error()})
 		return
 	}
 
-	// Inyectar el usuario que está realizando la acción
 	venta.IDUsuario = c.GetString("userID")
 
 	if err := h.ventasRepo.CreateVentaDirecta(c.Request.Context(), &venta); err != nil {
@@ -110,7 +108,6 @@ func (h *APIHandler) GetMetodosPago(c *gin.Context) {
 		return
 	}
 
-	// Prevenir nulos para el frontend
 	if metodos == nil {
 		metodos = []map[string]any{}
 	}

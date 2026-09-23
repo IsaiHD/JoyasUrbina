@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"joyas-urbina-backend/internal/core/domain"
 	"joyas-urbina-backend/internal/core/ports"
@@ -17,31 +18,74 @@ func NewVentasRepo(db *sql.DB) ports.VentasRepository {
 	return &VentasRepo{db: db}
 }
 
-// VincularPagoConVenta inserta la venta y marca la transacción como VINCULADO bajo una transacción ACID
-func (r *VentasRepo) VincularPagoConVenta(ctx context.Context, v *domain.Venta, txID int) error {
+// VincularPagoBatch inserta múltiples productos asociados a un único pago y actualiza la transacción
+// VincularPagoBatch inserta múltiples productos asociados a un único pago
+// usando la fecha real en que la máquina Point procesó la transacción.
+func (r *VentasRepo) VincularPagoBatch(ctx context.Context, userID string, req *domain.VincularPagoBatchRequest) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("error iniciando transacción: %w", err)
 	}
 	defer tx.Rollback()
 
-	queryVenta := `
-		INSERT INTO venta (
-			nombre_producto, sku_joya, precio_venta, cantidad, id_metodo_pago,
-			id_tipo, id_material, id_piedra, id_piedra_secundaria, id_usuario, payment_id, cuotas
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
-
-	_, err = tx.ExecContext(ctx, queryVenta,
-		v.NombreProducto, v.SKU, v.PrecioVenta, v.Cantidad, v.IDMetodoPago,
-		v.IDTipo, v.IDMaterial, v.IDPiedra, v.IDPiedraSecundaria, v.IDUsuario, v.PaymentID, v.Cuotas)
+	// 1. Obtener la fecha real del cobro registrada por la máquina Point
+	var fechaReal time.Time
+	queryFecha := `SELECT creado_en FROM pago_transaccion WHERE payment_id = $1`
+	err = tx.QueryRowContext(ctx, queryFecha, req.PaymentID).Scan(&fechaReal)
 	if err != nil {
-		return fmt.Errorf("error insertando venta: %w", err)
+		// Fallback por seguridad si no encuentra la fecha previa
+		fechaReal = time.Now()
 	}
 
-	queryTx := `UPDATE pago_transaccion SET estado_vinculacion = 'VINCULADO' WHERE id_transaccion = $1`
-	_, err = tx.ExecContext(ctx, queryTx, txID)
+	// 2. Insertar cada producto usando la fechaReal de la máquina ($14)
+	queryVenta := `
+		INSERT INTO venta (
+			nombre_producto, sku_joya, precio_venta, cantidad, es_reversible,
+			id_metodo_pago, id_tipo, id_material, id_piedra, id_piedra_secundaria,
+			id_usuario, payment_id, cuotas, fecha_venta
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`
+
+	stmt, err := tx.PrepareContext(ctx, queryVenta)
 	if err != nil {
-		return fmt.Errorf("error actualizando pago_transaccion: %w", err)
+		return fmt.Errorf("error preparando query batch: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, item := range req.Items {
+		_, err := stmt.ExecContext(ctx,
+			item.NombreProducto,
+			item.SKU,
+			item.PrecioVenta,
+			item.Cantidad,
+			item.EsReversible,
+			req.IDMetodoPago,
+			item.IDTipo,
+			item.IDMaterial,
+			item.IDPiedra,
+			item.IDPiedraSecundaria,
+			userID,
+			req.PaymentID,
+			req.Cuotas,
+			fechaReal, // <-- Fecha exacta de la máquina
+		)
+		if err != nil {
+			return fmt.Errorf("error insertando joya (%s): %w", item.NombreProducto, err)
+		}
+	}
+
+	// 3. Marcar la transacción como VINCULADO
+	queryTx := `UPDATE pago_transaccion SET estado_vinculacion = 'VINCULADO' WHERE payment_id = $1`
+	res, err := tx.ExecContext(ctx, queryTx, req.PaymentID)
+	if err != nil {
+		return fmt.Errorf("error actualizando estado de pago_transaccion: %w", err)
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error verificando filas actualizadas: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("no se encontró transacción con payment_id %s", req.PaymentID)
 	}
 
 	return tx.Commit()
@@ -51,13 +95,15 @@ func (r *VentasRepo) VincularPagoConVenta(ctx context.Context, v *domain.Venta, 
 func (r *VentasRepo) CreateVentaDirecta(ctx context.Context, v *domain.Venta) error {
 	query := `
 		INSERT INTO venta (
-			nombre_producto, sku_joya, precio_venta, cantidad, id_metodo_pago,
-			id_tipo, id_material, id_piedra, id_piedra_secundaria, id_usuario, cuotas
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
+			nombre_producto, sku_joya, precio_venta, cantidad, es_reversible,
+			id_metodo_pago, id_tipo, id_material, id_piedra, id_piedra_secundaria,
+			id_usuario, cuotas, fecha_venta
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`
 
 	_, err := r.db.ExecContext(ctx, query,
-		v.NombreProducto, v.SKU, v.PrecioVenta, v.Cantidad, v.IDMetodoPago,
-		v.IDTipo, v.IDMaterial, v.IDPiedra, v.IDPiedraSecundaria, v.IDUsuario, v.Cuotas)
+		v.NombreProducto, v.SKU, v.PrecioVenta, v.Cantidad, v.EsReversible,
+		v.IDMetodoPago, v.IDTipo, v.IDMaterial, v.IDPiedra, v.IDPiedraSecundaria,
+		v.IDUsuario, v.Cuotas)
 	if err != nil {
 		return fmt.Errorf("error creando venta directa: %w", err)
 	}
@@ -73,7 +119,7 @@ func (r *VentasRepo) GetVentas(ctx context.Context) ([]domain.Venta, error) {
 			v.id_venta, v.fecha_venta, v.nombre_producto, COALESCE(v.sku_joya, ''), 
 			v.precio_venta, COALESCE(v.cantidad, 1), COALESCE(v.es_reversible, false),
 			COALESCE(v.id_metodo_pago, 0), COALESCE(v.id_tipo, 0), COALESCE(v.id_material, 0), 
-			COALESCE(v.id_piedra, 0), COALESCE(v.id_piedra_secundaria, 0), 
+			v.id_piedra, v.id_piedra_secundaria, 
 			COALESCE(v.id_usuario, '00000000-0000-0000-0000-000000000000'), 
 			COALESCE(v.payment_id, ''), COALESCE(v.cuotas, 1)
 		FROM venta v
@@ -108,7 +154,6 @@ func (r *VentasRepo) GetVentas(ctx context.Context) ([]domain.Venta, error) {
 
 // GetCatalogs extrae tipo_joyas, material y piedra garantizando slices no nulos
 func (r *VentasRepo) GetCatalogs(ctx context.Context) (*domain.Catalogs, error) {
-	// Inicializados como slices vacíos para evitar 'null' en la salida JSON
 	catalogo := &domain.Catalogs{
 		Tipos:      []domain.CatalogoItem{},
 		Materiales: []domain.CatalogoItem{},

@@ -2,7 +2,7 @@ package domain
 
 import "time"
 
-// Equivalente a VentaPayload y Venta en la base de datos
+// Venta representa una fila individual en la tabla public.venta
 type Venta struct {
 	IDVenta            int       `json:"id_venta,omitempty"`
 	NombreProducto     string    `json:"nombre_producto"`
@@ -13,12 +13,33 @@ type Venta struct {
 	IDMetodoPago       int       `json:"id_metodo_pago"`
 	IDTipo             int       `json:"id_tipo,omitempty"`
 	IDMaterial         int       `json:"id_material,omitempty"`
-	IDPiedra           *int      `json:"id_piedra,omitempty"`            // Cambiado a puntero *int
-	IDPiedraSecundaria *int      `json:"id_piedra_secundaria,omitempty"` // Cambiado a puntero *int
+	IDPiedra           *int      `json:"id_piedra,omitempty"`
+	IDPiedraSecundaria *int      `json:"id_piedra_secundaria,omitempty"`
 	IDUsuario          string    `json:"id_usuario,omitempty"`
 	PaymentID          string    `json:"payment_id,omitempty"`
 	Cuotas             int       `json:"cuotas,omitempty"`
 	FechaVenta         time.Time `json:"fecha_venta,omitempty"`
+}
+
+// ItemVenta representa cada joya individual dentro de una venta batch
+type ItemVenta struct {
+	NombreProducto     string  `json:"nombre_producto" binding:"required"`
+	SKU                string  `json:"sku_joya"`
+	PrecioVenta        float64 `json:"precio_venta" binding:"required,gt=0"`
+	Cantidad           int     `json:"cantidad" binding:"required,gt=0"`
+	EsReversible       bool    `json:"es_reversible"`
+	IDTipo             int     `json:"id_tipo"`
+	IDMaterial         int     `json:"id_material"`
+	IDPiedra           *int    `json:"id_piedra"`
+	IDPiedraSecundaria *int    `json:"id_piedra_secundaria"`
+}
+
+// VincularPagoBatchRequest es el payload que enviará el modal al confirmar
+type VincularPagoBatchRequest struct {
+	PaymentID    string      `json:"payment_id" binding:"required"`
+	IDMetodoPago int         `json:"id_metodo_pago"`
+	Cuotas       int         `json:"cuotas"`
+	Items        []ItemVenta `json:"items" binding:"required,min=1"`
 }
 
 type CatalogoItem struct {

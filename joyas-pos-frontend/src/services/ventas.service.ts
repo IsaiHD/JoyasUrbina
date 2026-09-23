@@ -1,4 +1,4 @@
-import type { CreateVentaDTO, Venta, VentaPayload } from '../types/ventas.types';
+import type { CreateVentaDTO, Venta, VincularPagoBatchDTO } from '../types/ventas.types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://pos-backend-1036638430233.southamerica-west1.run.app';
 
@@ -14,20 +14,17 @@ const getAuthHeaders = () => {
   };
 };
 
-export const vincularPagoConVenta = async (venta: VentaPayload, transaccionId: number) => {
-  // Enviamos tanto la venta como el ID de transacción al endpoint unificado en Go
+// Nueva función para vincular múltiples productos a un cobro de Mercado Pago
+export const vincularPagoBatch = async (payload: VincularPagoBatchDTO) => {
   const response = await fetch(`${API_URL}/api/v1/ventas/vincular`, {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify({
-      venta,
-      transaccion_id: transaccionId
-    })
+    body: JSON.stringify(payload)
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(errorText || 'Error al vincular el pago con la venta');
+    throw new Error(errorText || 'Error al vincular los productos con el pago');
   }
 
   return response.json();
@@ -49,7 +46,7 @@ export const ventasService = {
     return data || [];
   },
 
-// 2. Registrar nueva venta directa (manual)
+  // 2. Registrar nueva venta directa (manual)
   async createVenta(venta: CreateVentaDTO): Promise<boolean> {
     const payload = {
       nombre_producto: venta.nombre_producto,
@@ -82,10 +79,10 @@ export const ventasService = {
     return true;
   },
 
-  // 3. Vincular pago Point
-  vincularPagoConVenta,
+  // 3. Vincular pago Point (Multi-producto)
+  vincularPagoBatch,
 
-// 4. Obtener catálogos para los selects del formulario adaptados al JSON de Go
+  // 4. Obtener catálogos para los selects del formulario adaptados al JSON de Go
   async getCatalogs() {
     const response = await fetch(`${API_URL}/api/v1/catalogos`, {
       method: 'GET',

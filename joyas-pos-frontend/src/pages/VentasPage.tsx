@@ -8,7 +8,7 @@ import { supabase } from '../supabaseClient';
 import './VentasPage.css';
 
 export default function VentasPage() {
-  const { ventas, catalogs, metodosPago, addVenta } = useVentas();
+  const { ventas, catalogs, metodosPago, addVenta, refetch } = useVentas();
   const { session } = useAuth();
 
   const [loadingSale, setLoadingSale] = useState(false);
@@ -307,6 +307,7 @@ export default function VentasPage() {
         onVentaCompletada={() => {
           setPagoPendiente(null);
           setShowSuccess(true);
+          refetch();
         }} 
       />
     </div>
